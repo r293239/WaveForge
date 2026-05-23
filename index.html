@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WaveForge - Survive the Horde</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="merge-info" id="mergeInfo"></div>
+    <div class="reload-indicator" id="reloadIndicator">RELOADING...</div>
+    
+    <div class="app-layout">
+        <div class="game-header">
+            <h1 class="game-title">⚒️ WaveForge</h1>
+            <p class="game-subtitle">Forge your arsenal. Survive the waves. Become legendary.</p>
+        </div>
+
+        <div class="main-content">
+            <div class="game-area">
+                <div class="canvas-container">
+                    <div class="wave-display" id="waveDisplay">Wave 1</div>
+                    <div class="monster-count" id="monsterCount">Monsters: 0</div>
+                    <canvas id="gameCanvas" width="800" height="600"></canvas>
+                </div>
+            </div>
+
+            <div class="ui-panel">
+                <div class="panel-section">
+                    <h3 class="section-title">Forge Master</h3>
+                    <div class="stats-grid" id="playerStats"></div>
+                    <div class="health-container">
+                        <div class="stat-label">Vitality</div>
+                        <div class="health-bar"><div class="health-fill" id="healthFill"></div></div>
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <h3 class="section-title">Armory (6 Slots)</h3>
+                    <div class="weapons-grid" id="weaponsGrid"></div>
+                    <button class="btn btn-danger scrap-weapon-btn" id="scrapWeaponBtn" style="display:none;">
+                        <span>🗑️</span> Scrap Weapon
+                    </button>
+                    <button class="btn btn-success merge-weapon-btn" id="mergeWeaponBtn" style="display:none;">
+                        <span>🔄</span> Merge Weapons
+                    </button>
+                </div>
+
+                <div class="consumables-container">
+                    <h4>Consumables</h4>
+                    <div class="consumables-grid" id="consumablesGrid"></div>
+                </div>
+
+                <div class="wave-button-container">
+                    <button class="btn btn-primary next-wave-btn" id="nextWaveBtn">
+                        <span>⚔️</span> Start Next Wave
+                    </button>
+                </div>
+
+                <div class="panel-section">
+                    <div class="shop-header">
+                        <h3 class="section-title">Forge Shop</h3>
+                        <button class="refresh-btn" id="refreshShopBtn">
+                            <span>🔄</span> Refresh <span class="refresh-cost" id="refreshCost">5g</span>
+                        </button>
+                    </div>
+                    <div class="shop-items" id="shopItems"></div>
+                    <div class="refresh-counter" id="refreshCounter">Refreshes: 0</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overlays -->
+    <div class="overlay" id="startScreen"></div>
+    <div class="overlay" id="waveCompleteOverlay" style="display:none;"></div>
+    <div class="overlay" id="gameOverOverlay" style="display:none;"></div>
+    <div class="overlay" id="difficultySelect" style="display:none;"></div>
+
+    <!-- Data Files (no dependencies) -->
+    <script src="js/data/constants.js"></script>
+    <script src="js/data/weapons.js"></script>
+    <script src="js/data/items.js"></script>
+    <script src="js/data/monsters.js"></script>
+    <script src="js/data/bosses.js"></script>
+    <script src="js/data/waves.js"></script>
+    <script src="js/data/upgrades.js"></script>
+
+    <!-- Core Systems -->
+    <script src="js/core/physics.js"></script>
+    <script src="js/core/arena.js"></script>
+    
+    <!-- Entities -->
+    <script src="js/entities/player.js"></script>
+    <script src="js/entities/monsters.js"></script>
+    <script src="js/entities/monster-brain.js"></script>
+    <script src="js/entities/boss.js"></script>
+
+    <!-- Weapons -->
+    <script src="js/weapons/weapon-base.js"></script>
+    <script src="js/weapons/melee-weapons.js"></script>
+    <script src="js/weapons/ranged-weapons.js"></script>
+
+    <!-- Systems -->
+    <script src="js/systems/combat.js"></script>
+    <script src="js/systems/towers.js"></script>
+    <script src="js/systems/effects.js"></script>
+    <script src="js/systems/shop.js"></script>
+    <script src="js/systems/waves.js"></script>
+    <script src="js/systems/upgrades.js"></script>
+
+    <!-- UI -->
+    <script src="js/ui/messages.js"></script>
+    <script src="js/ui/hud.js"></script>
+    <script src="js/ui/stats-panel.js"></script>
+    <script src="js/ui/overlays.js"></script>
+
+    <!-- Utils -->
+    <script src="js/utils/joystick.js"></script>
+    <script src="js/utils/save.js"></script>
+
+    <!-- Core Backbone (depends on everything above) -->
+    <script src="js/core/backbone.js"></script>
+</body>
+</html>
