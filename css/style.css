@@ -1122,4 +1122,24 @@ canvas {
 
 @media (max-width: 768px) {
     .main-content { flex-direction: column; }
-   
+    .game-title { font-size: 2.5rem; }
+    .weapons-grid { grid-template-columns: repeat(3, 1fr); }
+    .stat-buffs { grid-template-columns: 1fr; }
+    .feature-list { grid-template-columns: 1fr; }
+    
+    canvas {
+        width: 100%;
+        height: auto;
+    }
+    
+    .overlay-content { padding: 30px 20px; }
+    .overlay-title { font-size: 2.5rem; }
+    
+    .game-area, .ui-panel { overflow-y: visible; }
+    body { height: auto; overflow-y: auto; }
+    
+    .joystick-base { width: 100px; height: 100px; }
+    .joystick-handle { width: 40px; height: 40px; }
+    
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+}
