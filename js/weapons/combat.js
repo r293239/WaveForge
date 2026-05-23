@@ -140,4 +140,75 @@ const Combat = {
     applyMeleeDamage(attack, monster, index) {
         let dmg = attack.damage * Player.damageMultiplier * Game.difficultyMultipliers.playerDamage;
         
-       
+        // Critical hit
+        if (Math.random() < Player.criticalChance) {
+            dmg *= 2;
+            Effects.damageIndicator(monster.x, monster.y, Math.floor(dmg), true);
+        } else {
+            Effects.damageIndicator(monster.x, monster.y, Math.floor(dmg), false);
+        }
+        
+        monster.health -= dmg;
+        
+        // Life steal
+        if (Player.lifeSteal > 0) {
+            const healAmount = Math.floor(dmg * Player.lifeSteal);
+            if (healAmount > 0) Player.heal(healAmount);
+        }
+        
+        // Knockback for axe
+        if (attack.weaponId === 'axe') {
+            const kbForce = 8;
+            const kbAngle = Math.atan2(monster.y - attack.x, monster.x - attack.y);
+            monster.x += Math.cos(kbAngle) * kbForce;
+            monster.y += Math.sin(kbAngle) * kbForce;
+            Physics.clampToArena(monster);
+        }
+        
+        // Knockback upgrade
+        if (Player.knockback && attack.weaponId !== 'axe') {
+            const kbForce = 6;
+            const kbAngle = Math.atan2(monster.y - attack.x, monster.x - attack.y);
+            monster.x += Math.cos(kbAngle) * kbForce;
+            monster.y += Math.sin(kbAngle) * kbForce;
+            Physics.clampToArena(monster);
+        }
+        
+        // Status effects from weapon
+        const weaponRef = attack.weaponRef;
+        if (weaponRef) {
+            if (weaponRef.poisonDamage && !monster.poisoned) {
+                monster.poisoned = true;
+                monster.poisonDmg = weaponRef.poisonDamage;
+                monster.poisonEnd = Date.now() + (weaponRef.poisonDuration || 3000);
+            }
+            if (weaponRef.bleedDamage && !monster.bleeding) {
+                monster.bleeding = true;
+                monster.bleedDmg = weaponRef.bleedDamage;
+                monster.bleedEnd = Date.now() + (weaponRef.bleedDuration || 4000);
+            }
+            if (weaponRef.stunDuration && !monster.stunned) {
+                monster.stunned = true;
+                monster.stunnedUntil = Date.now() + weaponRef.stunDuration;
+                monster.speed = 0;
+            }
+            if (weaponRef.fireDamage) {
+                Effects.groundFire(monster.x, monster.y, 30, weaponRef.fireDamage, weaponRef.fireDuration || 2000);
+            }
+        }
+        
+        // Check death
+        if (monster.health <= 0) {
+            Monsters.handleDeath(monster, index);
+        }
+    },
+    
+    // Draw all melee attacks
+    drawMeleeAttacks() {
+        for (let attack of Player.meleeAttacks) {
+            MeleeWeapons.drawAttack(attack);
+        }
+        // Also draw boss attacks
+        Boss.drawAttacks();
+    }
+};
