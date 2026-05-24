@@ -19,7 +19,6 @@ const Projectiles = {
         this.monsterProjectiles = [];
     },
     
-    // Spawn a projectile
     spawn(data) {
         data.distanceTraveled = 0;
         data.startTime = data.startTime || Date.now();
@@ -28,7 +27,6 @@ const Projectiles = {
         return data;
     },
     
-    // Gunner monster projectile
     shootGunner(monster) {
         if (!Player.entity) return;
         const angle = Math.atan2(Player.entity.y - monster.y, Player.entity.x - monster.x);
@@ -44,7 +42,6 @@ const Projectiles = {
         });
     },
     
-    // Boss projectile
     shootBoss(boss) {
         if (!Player.entity) return;
         const angle = Math.atan2(Player.entity.y - boss.y, Player.entity.x - boss.x);
@@ -65,37 +62,35 @@ const Projectiles = {
         }
     },
     
-    // Update all projectiles
     update(currentTime) {
         this.updatePlayerProjectiles(currentTime);
         this.updateBossProjectiles(currentTime);
         this.updateMonsterProjectiles(currentTime);
     },
     
-    // Update player projectiles
     updatePlayerProjectiles(currentTime) {
         for (let i = this.active.length - 1; i >= 0; i--) {
             const proj = this.active[i];
             
-            // Move
             proj.x += Math.cos(proj.angle) * proj.speed;
             proj.y += Math.sin(proj.angle) * proj.speed;
             proj.distanceTraveled = (proj.distanceTraveled || 0) + proj.speed;
             
-            // Boomerang logic
             if (proj.isBoomerang) {
                 this.updateBoomerang(proj, i);
                 continue;
             }
             
-            // Out of bounds / range
-            if (proj.distanceTraveled > proj.range || 
-                !Arena.isInBounds(proj.x, proj.y)) {
+            if (proj.isThrownTrident) {
+                this.updateThrownTrident(proj, i);
+                continue;
+            }
+            
+            if (proj.distanceTraveled > proj.range || !Arena.isInBounds(proj.x, proj.y)) {
                 this.active.splice(i, 1);
                 continue;
             }
             
-            // Check hits
             let hit = false;
             for (let j = Monsters.active.length - 1; j >= 0; j--) {
                 const monster = Monsters.active[j];
@@ -110,7 +105,93 @@ const Projectiles = {
         }
     },
     
-    // Boomerang update
+    updateThrownTrident(proj, index) {
+        // Check if trident traveled its range
+        if (proj.distanceTraveled > proj.range || !Arena.isInBounds(proj.x, proj.y)) {
+            this.dropTrident(proj, index);
+            return;
+        }
+        
+        // Check hits
+        for (let j = Monsters.active.length - 1; j >= 0; j--) {
+            const monster = Monsters.active[j];
+            if (proj.piercedEnemies.includes(monster)) continue;
+            
+            const dist = Physics.distance(proj, monster);
+            if (dist < monster.radius + (proj.size || 4)) {
+                // Apply damage
+                let dmg = proj.damage * Player.damageMultiplier * Game.difficultyMultipliers.playerDamage;
+                monster.health -= dmg;
+                Effects.damageIndicator(monster.x, monster.y, Math.floor(dmg), false);
+                
+                // Lightning strike
+                if (proj.lightningStrike) {
+                    this.applyLightningStrike(monster);
+                }
+                
+                proj.piercedEnemies.push(monster);
+                
+                // Check if should drop (no more pierce)
+                if (proj.piercedEnemies.length > proj.pierceCount) {
+                    this.dropTrident(proj, index);
+                    return;
+                }
+                
+                if (monster.health <= 0) {
+                    Monsters.handleDeath(monster, j);
+                }
+            }
+        }
+    },
+    
+    dropTrident(proj, index) {
+        proj.speed = 0;
+        if (proj.weaponRef) {
+            proj.weaponRef.isThrown = true;
+            proj.weaponRef.thrownX = proj.x;
+            proj.weaponRef.thrownY = proj.y;
+        }
+        this.active.splice(index, 1);
+    },
+    
+    applyLightningStrike(monster) {
+        const targets = [monster];
+        const chainRange = 100;
+        const maxChains = 3;
+        
+        for (let i = 0; i < maxChains; i++) {
+            const lastTarget = targets[targets.length - 1];
+            let nearest = null;
+            let nearestDist = chainRange;
+            
+            for (let other of Monsters.active) {
+                if (targets.includes(other)) continue;
+                const dist = Physics.distance(lastTarget, other);
+                if (dist < nearestDist) {
+                    nearestDist = dist;
+                    nearest = other;
+                }
+            }
+            
+            if (nearest) {
+                targets.push(nearest);
+            } else {
+                break;
+            }
+        }
+        
+        const lightningDamage = 25;
+        for (let i = 0; i < targets.length; i++) {
+            const target = targets[i];
+            target.health -= lightningDamage;
+            Effects.damageIndicator(target.x, target.y, lightningDamage, true);
+            
+            if (i > 0) {
+                Effects.lightningBolt(targets[i-1].x, targets[i-1].y, target.x, target.y);
+            }
+        }
+    },
+    
     updateBoomerang(proj, index) {
         if (proj.state === 'outgoing' && 
             (proj.distanceTraveled >= proj.range || !Arena.isInBounds(proj.x, proj.y))) {
@@ -123,7 +204,6 @@ const Projectiles = {
             const dist = Math.hypot(dx, dy);
             
             if (dist < 20) {
-                // Orbital mode
                 if (proj.weaponRef && proj.weaponRef.orbitalMode && !proj.orbiting) {
                     proj.orbiting = true;
                     proj.orbitAngle = 0;
@@ -139,14 +219,12 @@ const Projectiles = {
             proj.speed = proj.returnSpeed;
         }
         
-        // Orbital mode
         if (proj.orbiting && Player.entity) {
             proj.orbitAngle += proj.orbitSpeed;
             proj.x = Player.entity.x + Math.cos(proj.orbitAngle) * proj.orbitRadius;
             proj.y = Player.entity.y + Math.sin(proj.orbitAngle) * proj.orbitRadius;
         }
         
-        // Check hits
         for (let j = Monsters.active.length - 1; j >= 0; j--) {
             const monster = Monsters.active[j];
             if (proj.targetsHit.includes(monster)) continue;
@@ -163,7 +241,6 @@ const Projectiles = {
         }
     },
     
-    // Apply projectile damage
     applyProjectileDamage(proj, monster, monsterIndex, projIndex) {
         let dmg = proj.damage * Player.damageMultiplier * Game.difficultyMultipliers.playerDamage;
         
@@ -176,18 +253,15 @@ const Projectiles = {
         
         monster.health -= dmg;
         
-        // Life steal
         if (Player.lifeSteal > 0) {
             const healAmount = Math.floor(dmg * Player.lifeSteal);
             if (healAmount > 0) Player.heal(healAmount);
         }
         
-        // Throwing knife tracking
         if (proj.weaponRef && proj.weaponRef.isThrowable) {
             proj.weaponRef.trackKnifeHit(monster);
         }
         
-        // Explosive shot
         if (proj.weaponRef && proj.weaponRef.explosiveShot) {
             const exRadius = proj.weaponRef.explosiveRadius || 50;
             const exDamage = proj.weaponRef.explosiveDamage || 25;
@@ -204,8 +278,7 @@ const Projectiles = {
             }
         }
         
-        // Remove projectile (unless bouncing/boomerang)
-        if (!proj.isBoomerang && !proj.bounceCount) {
+        if (!proj.isBoomerang && !proj.bounceCount && !proj.isThrownTrident) {
             this.active.splice(projIndex, 1);
         } else if (proj.bounceCount > 0) {
             proj.bounceCount--;
@@ -214,7 +287,6 @@ const Projectiles = {
             if (proj.bounceCount <= 0) {
                 this.active.splice(projIndex, 1);
             } else {
-                // Find next bounce target
                 let nearest = null;
                 let nearestDist = proj.bounceRange || 100;
                 for (let k = 0; k < Monsters.active.length; k++) {
@@ -238,7 +310,6 @@ const Projectiles = {
         }
     },
     
-    // Update boss projectiles
     updateBossProjectiles(currentTime) {
         for (let i = this.bossProjectiles.length - 1; i >= 0; i--) {
             const proj = this.bossProjectiles[i];
@@ -257,7 +328,6 @@ const Projectiles = {
         }
     },
     
-    // Update monster projectiles
     updateMonsterProjectiles(currentTime) {
         for (let i = this.monsterProjectiles.length - 1; i >= 0; i--) {
             const proj = this.monsterProjectiles[i];
@@ -276,15 +346,15 @@ const Projectiles = {
         }
     },
     
-    // Draw all projectiles
     draw() {
         const ctx = Game.ctx;
         
-        // Player projectiles
         for (let proj of this.active) {
             ctx.save();
             if (proj.isBoomerang) {
                 this.drawBoomerang(ctx, proj);
+            } else if (proj.isThrownTrident) {
+                this.drawThrownTridentProjectile(ctx, proj);
             } else if (proj.animation === 'knife') {
                 this.drawKnife(ctx, proj);
             } else if (proj.animation === 'laser') {
@@ -302,7 +372,13 @@ const Projectiles = {
             ctx.restore();
         }
         
-        // Boss projectiles
+        // Draw dropped tridents on ground
+        for (let weapon of Player.weapons) {
+            if (weapon.id === 'spear' && weapon.isThrown) {
+                this.drawDroppedTrident(weapon);
+            }
+        }
+        
         for (let proj of this.bossProjectiles) {
             const age = Date.now() - proj.startTime;
             const alpha = Math.min(1, 1 - age / proj.lifetime);
@@ -318,7 +394,6 @@ const Projectiles = {
             ctx.restore();
         }
         
-        // Monster projectiles
         for (let proj of this.monsterProjectiles) {
             ctx.save();
             ctx.translate(proj.x, proj.y);
@@ -333,6 +408,81 @@ const Projectiles = {
             ctx.arc(0, 0, 2, 0, Math.PI * 2);
             ctx.fill();
             ctx.restore();
+        }
+    },
+    
+    drawThrownTridentProjectile(ctx, proj) {
+        ctx.save();
+        ctx.translate(proj.x, proj.y);
+        ctx.rotate(proj.angle);
+        ctx.shadowColor = '#CD7F32';
+        ctx.shadowBlur = 10;
+        
+        // Shaft
+        ctx.fillStyle = '#8B4513';
+        ctx.fillRect(-2, -15, 4, 30);
+        
+        // Prongs
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, -15);
+        ctx.lineTo(-6, -25);
+        ctx.lineTo(0, -20);
+        ctx.moveTo(0, -15);
+        ctx.lineTo(6, -25);
+        ctx.lineTo(0, -20);
+        ctx.moveTo(0, -15);
+        ctx.lineTo(0, -28);
+        ctx.stroke();
+        
+        ctx.restore();
+    },
+    
+    drawDroppedTrident(weapon) {
+        const ctx = Game.ctx;
+        if (!Player.entity) return;
+        
+        const dist = Physics.distance(Player.entity, { x: weapon.thrownX, y: weapon.thrownY });
+        
+        ctx.save();
+        ctx.translate(weapon.thrownX, weapon.thrownY);
+        ctx.rotate(Math.sin(Date.now() * 0.002) * 0.1);
+        
+        if (dist < weapon.pickupRange) {
+            ctx.shadowColor = '#FFD700';
+            ctx.shadowBlur = 15 + Math.sin(Date.now() * 0.01) * 5;
+        } else {
+            ctx.shadowColor = '#CD7F32';
+            ctx.shadowBlur = 5;
+        }
+        
+        // Shaft
+        ctx.fillStyle = '#8B4513';
+        ctx.fillRect(-2, -20, 4, 40);
+        
+        // Prongs
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, -20);
+        ctx.lineTo(-8, -30);
+        ctx.lineTo(0, -25);
+        ctx.moveTo(0, -20);
+        ctx.lineTo(8, -30);
+        ctx.lineTo(0, -25);
+        ctx.moveTo(0, -20);
+        ctx.lineTo(0, -32);
+        ctx.stroke();
+        
+        ctx.restore();
+        
+        // Auto-pickup when close
+        if (dist < weapon.pickupRange) {
+            weapon.isThrown = false;
+            weapon.thrownX = 0;
+            weapon.thrownY = 0;
+            Messages.show('Trident retrieved!', 1000);
         }
     },
     
