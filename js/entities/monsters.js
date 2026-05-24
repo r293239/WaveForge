@@ -16,6 +16,21 @@ const Monsters = {
         this.spawnIndicators = [];
     },
     
+    getAttackRange(typeKey, radius) {
+        switch (typeKey) {
+            case 'NORMAL':   return radius + 15;
+            case 'FAST':     return radius + 10;
+            case 'TANK':     return radius + 20;
+            case 'EXPLOSIVE': return radius + 18;
+            case 'GUNNER':   return radius + 12;
+            case 'SPLITTER': return radius + 25;
+            case 'DASHER':   return radius + 8;
+            case 'VAMPIRE':  return radius + 20;
+            case 'BOSS':     return radius + 35;
+            default:         return radius + 15;
+        }
+    },
+    
     create(typeKey, isBoss = false, spawnX = null, spawnY = null) {
         const type = MONSTER_TYPES[typeKey];
         if (!type) return null;
@@ -72,7 +87,7 @@ const Monsters = {
             explosive: type.explosive || false,
             explosionRadius: type.explosionRadius || 100,
             explosionDamage: type.explosionDamage || 3.0,
-            attackRange: type.attackRange || 25,
+            attackRange: this.getAttackRange(typeKey, radius),
             attackAnimation: null,
             attackAnimStart: 0,
             attackAnimDuration: 400,
@@ -425,7 +440,7 @@ const Monsters = {
     },
     
     // ============================================
-    // ATTACK ANIMATION DRAWING
+    // ATTACK ANIMATIONS
     // ============================================
     
     drawAttackAnimation(monster, progress, alpha) {
@@ -462,9 +477,6 @@ const Monsters = {
             case 'VAMPIRE':
                 this.drawVampireAttack(ctx, monster, progress, alpha);
                 break;
-            case 'BOSS':
-                // Boss attacks handled by Boss.drawAttacks()
-                break;
             default:
                 this.drawNormalAttack(ctx, monster, progress, alpha);
         }
@@ -474,24 +486,31 @@ const Monsters = {
         // Apply damage at mid-animation
         if (progress > 0.3 && progress < 0.5 && monster.attackAnimation && !monster.attackAnimation.damageApplied) {
             monster.attackAnimation.damageApplied = true;
-            const target = monster.attackAnimation.targetX ? 
-                { x: monster.attackAnimation.targetX, y: monster.attackAnimation.targetY } : 
-                Player.entity;
-            if (target && target.health !== undefined) {
-                // Damage towers
-                for (let tower of Towers.healingTowers) {
-                    if (Math.abs(tower.x - target.x) < 5 && Math.abs(tower.y - target.y) < 5) {
-                        tower.health -= monster.damage;
-                        Effects.damageIndicator(tower.x, tower.y, monster.damage, false);
-                        if (tower.health <= 0) {
-                            const idx = Towers.healingTowers.indexOf(tower);
-                            if (idx > -1) Towers.healingTowers.splice(idx, 1);
-                        }
-                        return;
+            
+            // Check if target is a tower
+            let hitTower = false;
+            for (let tower of Towers.healingTowers) {
+                const dx = tower.x - monster.x;
+                const dy = tower.y - monster.y;
+                const dist = Math.hypot(dx, dy);
+                if (dist < monster.attackRange + tower.radius + 10) {
+                    tower.health -= monster.damage;
+                    Effects.damageIndicator(tower.x, tower.y, monster.damage, false);
+                    if (tower.health <= 0) {
+                        const idx = Towers.healingTowers.indexOf(tower);
+                        if (idx > -1) Towers.healingTowers.splice(idx, 1);
                     }
+                    hitTower = true;
+                    break;
                 }
-                // Damage player
-                if (target === Player.entity || (target.x === Player.entity?.x && target.y === Player.entity?.y)) {
+            }
+            
+            // Damage player if no tower was hit
+            if (!hitTower && Player.entity) {
+                const dx = Player.entity.x - monster.x;
+                const dy = Player.entity.y - monster.y;
+                const dist = Math.hypot(dx, dy);
+                if (dist < monster.attackRange + Player.entity.radius + 10) {
                     let dmg = monster.damage;
                     if (monster.isVampire && monster.lifeSteal > 0) {
                         const heal = Math.floor(dmg * monster.lifeSteal);
@@ -504,12 +523,10 @@ const Monsters = {
     },
     
     drawNormalAttack(ctx, monster, progress, alpha) {
-        // Bite/chomp animation
         const biteProgress = Math.sin(progress * Math.PI);
         const jawOpen = biteProgress * 12;
         const dist = monster.attackRange * progress;
         
-        // Upper jaw
         ctx.fillStyle = `rgba(255,107,107,${alpha})`;
         ctx.beginPath();
         ctx.moveTo(monster.radius, -jawOpen);
@@ -518,7 +535,6 @@ const Monsters = {
         ctx.lineTo(monster.radius, 0);
         ctx.fill();
         
-        // Lower jaw
         ctx.beginPath();
         ctx.moveTo(monster.radius, jawOpen);
         ctx.lineTo(monster.radius + dist, 5 + jawOpen);
@@ -526,7 +542,6 @@ const Monsters = {
         ctx.lineTo(monster.radius, 0);
         ctx.fill();
         
-        // Teeth
         ctx.fillStyle = '#fff';
         for (let i = 0; i < 3; i++) {
             const toothX = monster.radius + dist * (0.3 + i * 0.25);
@@ -544,7 +559,6 @@ const Monsters = {
     },
     
     drawFastAttack(ctx, monster, progress, alpha) {
-        // Quick slash - multiple fast lines
         const slashCount = 3;
         for (let i = 0; i < slashCount; i++) {
             const slashProgress = (progress * slashCount - i) % 1;
@@ -565,25 +579,18 @@ const Monsters = {
     },
     
     drawTankAttack(ctx, monster, progress, alpha) {
-        // Heavy slam with shockwave
-        const liftPhase = progress < 0.3;
-        const slamPhase = progress >= 0.3;
-        
-        if (liftPhase) {
-            // Raising up
+        if (progress < 0.3) {
             const liftProgress = progress / 0.3;
             const liftY = -20 * liftProgress;
             ctx.fillStyle = `rgba(255,165,0,${alpha})`;
             ctx.fillRect(monster.radius, liftY - 10, 25, 20);
         } else {
-            // Slamming down with shockwave
             const slamProgress = (progress - 0.3) / 0.7;
             const shakeAmount = (1 - slamProgress) * 15;
             
             ctx.fillStyle = `rgba(255,165,0,${alpha})`;
             ctx.fillRect(monster.radius, -shakeAmount, 30, 15 + shakeAmount);
             
-            // Shockwave
             const waveRadius = slamProgress * 40;
             ctx.strokeStyle = `rgba(255,140,0,${alpha * (1 - slamProgress)})`;
             ctx.lineWidth = 4;
@@ -594,21 +601,18 @@ const Monsters = {
     },
     
     drawExplosiveAttack(ctx, monster, progress, alpha) {
-        // Pulsing glow before explosion-like attack
         const pulseScale = 1 + Math.sin(progress * Math.PI * 3) * 0.3;
         const glowRadius = monster.attackRange * progress * pulseScale;
         
-        // Glowing aura
         const gradient = ctx.createRadialGradient(monster.radius, 0, 0, monster.radius, 0, glowRadius);
         gradient.addColorStop(0, `rgba(255,0,0,${alpha * 0.8})`);
         gradient.addColorStop(0.5, `rgba(255,100,0,${alpha * 0.4})`);
-        gradient.addColorStop(1, `rgba(255,0,0,0)`);
+        gradient.addColorStop(1, 'rgba(255,0,0,0)');
         ctx.fillStyle = gradient;
         ctx.beginPath();
         ctx.arc(monster.radius, 0, glowRadius, 0, Math.PI * 2);
         ctx.fill();
         
-        // Spark particles
         for (let i = 0; i < 5; i++) {
             const sparkAngle = (i / 5) * Math.PI * 2 + progress * Math.PI;
             const sparkDist = glowRadius * (0.5 + Math.random() * 0.5);
@@ -621,7 +625,6 @@ const Monsters = {
     },
     
     drawGunnerMelee(ctx, monster, progress, alpha) {
-        // Gun butt smash
         const swingProgress = Math.sin(progress * Math.PI);
         const dist = monster.attackRange * progress;
         
@@ -633,13 +636,11 @@ const Monsters = {
         ctx.lineTo(monster.radius + dist, -swingProgress * 10);
         ctx.stroke();
         
-        // Gun stock shape
         ctx.fillStyle = `rgba(255,105,180,${alpha})`;
         ctx.fillRect(monster.radius + dist - 5, -swingProgress * 10 - 8, 15, 16);
     },
     
     drawSplitterAttack(ctx, monster, progress, alpha) {
-        // Tentacle whip
         const whipProgress = Math.sin(progress * Math.PI * 2);
         const dist = monster.attackRange * progress;
         
@@ -648,7 +649,6 @@ const Monsters = {
         ctx.beginPath();
         ctx.moveTo(monster.radius, 0);
         
-        // Wavy tentacle
         for (let i = 0; i <= 10; i++) {
             const t = i / 10;
             const x = monster.radius + dist * t;
@@ -657,7 +657,6 @@ const Monsters = {
         }
         ctx.stroke();
         
-        // Forked tip
         const tipX = monster.radius + dist;
         const tipY = Math.sin(Math.PI * 3 + whipProgress * 5) * 8;
         ctx.beginPath();
@@ -669,7 +668,6 @@ const Monsters = {
     },
     
     drawDasherAttack(ctx, monster, progress, alpha) {
-        // Speed lines burst
         for (let i = 0; i < 6; i++) {
             const lineAngle = (i / 6) * Math.PI * 2;
             const dist = monster.attackRange * progress * (0.5 + i * 0.1);
@@ -686,7 +684,6 @@ const Monsters = {
     },
     
     drawVampireAttack(ctx, monster, progress, alpha) {
-        // Dark claw swipe with red trails
         const clawCount = 3;
         for (let i = 0; i < clawCount; i++) {
             const clawProgress = (progress * clawCount - i) % 1;
@@ -695,7 +692,6 @@ const Monsters = {
             const dist = monster.attackRange * clawProgress;
             const yOffset = (i - 1) * 6;
             
-            // Trail
             ctx.strokeStyle = `rgba(139,0,139,${alpha * 0.5})`;
             ctx.lineWidth = 5;
             ctx.beginPath();
@@ -703,7 +699,6 @@ const Monsters = {
             ctx.lineTo(monster.radius + dist * 0.7, yOffset);
             ctx.stroke();
             
-            // Claw marks
             ctx.strokeStyle = `rgba(255,0,0,${alpha * (1 - clawProgress)})`;
             ctx.lineWidth = 2;
             ctx.beginPath();
@@ -716,7 +711,7 @@ const Monsters = {
     },
     
     // ============================================
-    // MAIN DRAW FUNCTION
+    // MAIN DRAW FUNCTION (Attack animations drawn ABOVE body)
     // ============================================
     
     draw() {
@@ -776,6 +771,16 @@ const Monsters = {
             ctx.arc(0, 0, monster.radius, 0, Math.PI * 2);
             ctx.stroke();
             
+            // ATTACK ANIMATION - Drawn above body so it's visible over player
+            if (monster.attackAnimation) {
+                const animProgress = (currentTime - monster.attackAnimation.startTime) / monster.attackAnimation.duration;
+                if (animProgress > 1) {
+                    monster.attackAnimation = null;
+                } else {
+                    this.drawAttackAnimation(monster, animProgress, 1 - animProgress * 0.5);
+                }
+            }
+            
             // Icon
             if (monster.monsterType && monster.monsterType.icon) {
                 ctx.fillStyle = 'white';
@@ -823,16 +828,6 @@ const Monsters = {
                 ctx.fillRect(barX, barY, barWidth * hpPercent, barHeight);
             }
             
-            // Attack animation
-            if (monster.attackAnimation) {
-                const animProgress = (currentTime - monster.attackAnimation.startTime) / monster.attackAnimation.duration;
-                if (animProgress > 1) {
-                    monster.attackAnimation = null;
-                } else {
-                    this.drawAttackAnimation(monster, animProgress, 1 - animProgress * 0.5);
-                }
-            }
-            
             ctx.restore();
         }
     },
@@ -841,39 +836,4 @@ const Monsters = {
         const ctx = Game.ctx;
         const currentTime = Date.now();
         
-        for (let indicator of this.spawnIndicators) {
-            const elapsed = currentTime - indicator.startTime;
-            const progress = elapsed / indicator.timer;
-            if (elapsed > indicator.timer) continue;
-            
-            const pulseScale = 1 + Math.sin(progress * Math.PI * 4) * 0.2;
-            const alpha = 1 - progress * 0.5;
-            
-            ctx.save();
-            ctx.translate(indicator.x, indicator.y);
-            
-            if (indicator.isBoss) {
-                ctx.strokeStyle = `rgba(255,215,0,${alpha})`;
-                ctx.lineWidth = 4;
-                ctx.shadowColor = '#ffd700';
-                ctx.shadowBlur = 20 * alpha;
-                ctx.rotate(elapsed * 0.002);
-                ctx.beginPath(); ctx.arc(0, 0, 40 * pulseScale, 0, Math.PI * 2); ctx.stroke();
-                ctx.beginPath(); ctx.arc(0, 0, 25, 0, Math.PI * 2); ctx.stroke();
-                ctx.rotate(-elapsed * 0.002);
-                ctx.beginPath(); ctx.moveTo(-30, -30); ctx.lineTo(30, 30); ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(30, -30); ctx.lineTo(-30, 30); ctx.stroke();
-            } else {
-                ctx.strokeStyle = `rgba(255,0,0,${alpha})`;
-                ctx.lineWidth = 3;
-                ctx.shadowColor = '#f00';
-                ctx.shadowBlur = 10 * alpha;
-                ctx.beginPath(); ctx.arc(0, 0, 25 * pulseScale, 0, Math.PI * 2); ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(-15, -15); ctx.lineTo(15, 15); ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(15, -15); ctx.lineTo(-15, 15); ctx.stroke();
-            }
-            
-            ctx.restore();
-        }
-    }
-};
+        for (let
