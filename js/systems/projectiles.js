@@ -2,8 +2,7 @@
 // WAVEFORGE - Projectile System
 // ============================================
 
-const Projectiles = {
-    // Preload weapon images
+// Preload weapon images
 const projectileImages = {};
 const imagePaths = {
     handgun: 'assets/handgun.png',
@@ -20,6 +19,8 @@ for (let [key, path] of Object.entries(imagePaths)) {
     img.src = path;
     projectileImages[key] = img;
 }
+
+const Projectiles = {
     active: [],
     bossProjectiles: [],
     monsterProjectiles: [],
@@ -123,32 +124,27 @@ for (let [key, path] of Object.entries(imagePaths)) {
     },
     
     updateThrownTrident(proj, index) {
-        // Check if trident traveled its range
         if (proj.distanceTraveled > proj.range || !Arena.isInBounds(proj.x, proj.y)) {
             this.dropTrident(proj, index);
             return;
         }
         
-        // Check hits
         for (let j = Monsters.active.length - 1; j >= 0; j--) {
             const monster = Monsters.active[j];
             if (proj.piercedEnemies.includes(monster)) continue;
             
             const dist = Physics.distance(proj, monster);
             if (dist < monster.radius + (proj.size || 4)) {
-                // Apply damage
                 let dmg = proj.damage * Player.damageMultiplier * Game.difficultyMultipliers.playerDamage;
                 monster.health -= dmg;
                 Effects.damageIndicator(monster.x, monster.y, Math.floor(dmg), false);
                 
-                // Lightning strike
                 if (proj.lightningStrike) {
                     this.applyLightningStrike(monster);
                 }
                 
                 proj.piercedEnemies.push(monster);
                 
-                // Check if should drop (no more pierce)
                 if (proj.piercedEnemies.length > proj.pierceCount) {
                     this.dropTrident(proj, index);
                     return;
@@ -184,17 +180,11 @@ for (let [key, path] of Object.entries(imagePaths)) {
             for (let other of Monsters.active) {
                 if (targets.includes(other)) continue;
                 const dist = Physics.distance(lastTarget, other);
-                if (dist < nearestDist) {
-                    nearestDist = dist;
-                    nearest = other;
-                }
+                if (dist < nearestDist) { nearestDist = dist; nearest = other; }
             }
             
-            if (nearest) {
-                targets.push(nearest);
-            } else {
-                break;
-            }
+            if (nearest) { targets.push(nearest); }
+            else { break; }
         }
         
         const lightningDamage = 25;
@@ -249,7 +239,6 @@ for (let [key, path] of Object.entries(imagePaths)) {
             const dist = Physics.distance(proj, monster);
             if (dist < monster.radius + (proj.size || 4)) {
                 this.applyProjectileDamage(proj, monster, j, index);
-                
                 if (proj.targetsHit.length >= (proj.maxTargets || 4)) {
                     proj.state = 'returning';
                 }
@@ -363,6 +352,10 @@ for (let [key, path] of Object.entries(imagePaths)) {
         }
     },
     
+    // ============================================
+    // DRAWING
+    // ============================================
+    
     draw() {
         const ctx = Game.ctx;
         
@@ -378,6 +371,10 @@ for (let [key, path] of Object.entries(imagePaths)) {
                 this.drawLaser(ctx, proj);
             } else if (proj.animation === 'sniper') {
                 this.drawSniper(ctx, proj);
+            } else if (proj.animation === 'bolt') {
+                this.drawCrossbowBolt(ctx, proj);
+            } else if (proj.animation === 'bullet' || proj.animation === 'shotgun') {
+                this.drawBullet(ctx, proj);
             } else {
                 ctx.shadowColor = proj.color;
                 ctx.shadowBlur = 10;
@@ -389,13 +386,14 @@ for (let [key, path] of Object.entries(imagePaths)) {
             ctx.restore();
         }
         
-        // Draw dropped tridents on ground
+        // Draw dropped tridents
         for (let weapon of Player.weapons) {
             if (weapon.id === 'spear' && weapon.isThrown) {
                 this.drawDroppedTrident(weapon);
             }
         }
         
+        // Boss projectiles
         for (let proj of this.bossProjectiles) {
             const age = Date.now() - proj.startTime;
             const alpha = Math.min(1, 1 - age / proj.lifetime);
@@ -411,6 +409,7 @@ for (let [key, path] of Object.entries(imagePaths)) {
             ctx.restore();
         }
         
+        // Monster projectiles
         for (let proj of this.monsterProjectiles) {
             ctx.save();
             ctx.translate(proj.x, proj.y);
@@ -428,6 +427,70 @@ for (let [key, path] of Object.entries(imagePaths)) {
         }
     },
     
+    drawBullet(ctx, proj) {
+        const imgKey = proj.weaponId || 'handgun';
+        const img = projectileImages[imgKey];
+        if (img && img.complete && img.naturalWidth > 0) {
+            ctx.save();
+            ctx.translate(proj.x, proj.y);
+            ctx.rotate(proj.angle);
+            ctx.drawImage(img, -8, -4, 16, 8);
+            ctx.restore();
+        } else {
+            ctx.shadowColor = proj.color;
+            ctx.shadowBlur = 10;
+            ctx.fillStyle = proj.color;
+            ctx.beginPath();
+            ctx.arc(proj.x, proj.y, proj.size || 3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    },
+    
+    drawCrossbowBolt(ctx, proj) {
+        ctx.save();
+        ctx.translate(proj.x, proj.y);
+        ctx.rotate(proj.angle);
+        
+        // Arrow shaft
+        ctx.fillStyle = '#8B4513';
+        ctx.fillRect(-15, -1, 30, 2);
+        
+        // Arrow head (broadhead)
+        ctx.fillStyle = '#C0C0C0';
+        ctx.beginPath();
+        ctx.moveTo(15, -4);
+        ctx.lineTo(25, 0);
+        ctx.lineTo(15, 4);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Fletching feathers
+        ctx.fillStyle = '#F00';
+        ctx.beginPath();
+        ctx.moveTo(-15, -3);
+        ctx.lineTo(-25, -6);
+        ctx.lineTo(-15, -1);
+        ctx.closePath();
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(-15, 3);
+        ctx.lineTo(-25, 6);
+        ctx.lineTo(-15, 1);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Center feather
+        ctx.fillStyle = '#FFF';
+        ctx.beginPath();
+        ctx.moveTo(-15, 0);
+        ctx.lineTo(-22, -2);
+        ctx.lineTo(-22, 2);
+        ctx.closePath();
+        ctx.fill();
+        
+        ctx.restore();
+    },
+    
     drawThrownTridentProjectile(ctx, proj) {
         ctx.save();
         ctx.translate(proj.x, proj.y);
@@ -435,11 +498,9 @@ for (let [key, path] of Object.entries(imagePaths)) {
         ctx.shadowColor = '#CD7F32';
         ctx.shadowBlur = 10;
         
-        // Shaft
         ctx.fillStyle = '#8B4513';
         ctx.fillRect(-2, -15, 4, 30);
         
-        // Prongs
         ctx.strokeStyle = '#FFD700';
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -474,11 +535,9 @@ for (let [key, path] of Object.entries(imagePaths)) {
             ctx.shadowBlur = 5;
         }
         
-        // Shaft
         ctx.fillStyle = '#8B4513';
         ctx.fillRect(-2, -20, 4, 40);
         
-        // Prongs
         ctx.strokeStyle = '#FFD700';
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -494,7 +553,6 @@ for (let [key, path] of Object.entries(imagePaths)) {
         
         ctx.restore();
         
-        // Auto-pickup when close
         if (dist < weapon.pickupRange) {
             weapon.isThrown = false;
             weapon.thrownX = 0;
@@ -505,21 +563,30 @@ for (let [key, path] of Object.entries(imagePaths)) {
     
     drawBoomerang(ctx, proj) {
         proj.rotation = (proj.rotation || 0) + 0.1;
-        ctx.save();
-        ctx.translate(proj.x, proj.y);
-        ctx.rotate(proj.rotation);
-        ctx.shadowColor = '#8B4513';
-        ctx.shadowBlur = 10;
-        ctx.fillStyle = '#8B4513';
-        ctx.strokeStyle = '#654321';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(0, -5); ctx.lineTo(20, -10); ctx.lineTo(25, 0);
-        ctx.lineTo(20, 10); ctx.lineTo(0, 5);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-        ctx.restore();
+        const img = projectileImages['scythe']; // Boomerang uses scythe image or custom
+        if (img && img.complete && img.naturalWidth > 0) {
+            ctx.save();
+            ctx.translate(proj.x, proj.y);
+            ctx.rotate(proj.rotation);
+            ctx.drawImage(img, -20, -20, 40, 40);
+            ctx.restore();
+        } else {
+            ctx.save();
+            ctx.translate(proj.x, proj.y);
+            ctx.rotate(proj.rotation);
+            ctx.shadowColor = '#8B4513';
+            ctx.shadowBlur = 10;
+            ctx.fillStyle = '#8B4513';
+            ctx.strokeStyle = '#654321';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, -5); ctx.lineTo(20, -10); ctx.lineTo(25, 0);
+            ctx.lineTo(20, 10); ctx.lineTo(0, 5);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+        }
     },
     
     drawKnife(ctx, proj) {
