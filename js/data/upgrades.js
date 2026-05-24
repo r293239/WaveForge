@@ -11,9 +11,10 @@ const WEAPON_UPGRADES = [
     { id: 'dual_crits', name: 'Precision Blades', description: 'Dual daggers gain +15% crit chance', icon: '🎯', weaponId: 'dual_daggers', effect: { critChance: 0.15 } },
     { id: 'hammer_stun', name: 'Concussive Blow', description: 'Hammer stuns enemies for 1 second', icon: '💫', weaponId: 'hammer', effect: { stunDuration: 1000 } },
     { id: 'spear_return', name: 'Loyal Trident', description: 'Trident returns to you after thrusting', icon: '🔱', weaponId: 'spear', effect: { returningWeapon: true } },
+    { id: 'spear_lightning', name: 'Channeling Trident', description: 'Trident pierce removed, but strikes lightning on hit', icon: '⚡', weaponId: 'spear', effect: { lightningStrike: true, removePierce: true } },
     
     // === RANGED UPGRADES ===
-    { id: 'handgun_double', name: 'Double Tap', description: 'Handgun fires 2 bullets per shot', icon: '🔫🔫', weaponId: 'handgun', effect: { pelletCount: 2, spreadAngle: 10 } },
+    { id: 'handgun_double', name: 'Double Tap', description: 'Handgun fires 2 bullets per shot', icon: '🔫🔫', weaponId: 'handgun', effect: { pelletCount: 2, spreadAngle: 15 } },
     { id: 'shotgun_choke', name: 'Choke Mod', description: 'Shotgun spread reduced by 50%', icon: '🔧', weaponId: 'shotgun', effect: { spreadMult: 0.5 } },
     { id: 'shotgun_slug', name: 'Slug Rounds', description: 'Shotgun fires a single powerful slug (+40 dmg)', icon: '🎯', weaponId: 'shotgun', effect: { slugMode: true, slugDamage: 40 } },
     { id: 'machinegun_pierce', name: 'Armor Piercing', description: 'Machine gun pierces through 2 enemies', icon: '🔩', weaponId: 'machinegun', effect: { pierceCount: 2 } },
