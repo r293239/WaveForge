@@ -13,11 +13,16 @@ const imagePaths = {
     scythe: 'assets/scythe.png'
 };
 
-// Load images
-for (let [key, path] of Object.entries(imagePaths)) {
-    const img = new Image();
-    img.src = path;
-    projectileImages[key] = img;
+// Load images safely
+try {
+    for (let [key, path] of Object.entries(imagePaths)) {
+        const img = new Image();
+        img.onerror = () => console.log(`Image not found: ${path} (using fallback drawing)`);
+        img.src = path;
+        projectileImages[key] = img;
+    }
+} catch(e) {
+    console.log('Image loading error:', e.message);
 }
 
 const Projectiles = {
@@ -386,7 +391,7 @@ const Projectiles = {
             ctx.restore();
         }
         
-        // Draw dropped tridents
+        // Draw dropped tridents on ground
         for (let weapon of Player.weapons) {
             if (weapon.id === 'spear' && weapon.isThrown) {
                 this.drawDroppedTrident(weapon);
@@ -447,48 +452,38 @@ const Projectiles = {
     },
     
     drawCrossbowBolt(ctx, proj) {
-        ctx.save();
-        ctx.translate(proj.x, proj.y);
-        ctx.rotate(proj.angle);
-        
-        // Arrow shaft
-        ctx.fillStyle = '#8B4513';
-        ctx.fillRect(-15, -1, 30, 2);
-        
-        // Arrow head (broadhead)
-        ctx.fillStyle = '#C0C0C0';
-        ctx.beginPath();
-        ctx.moveTo(15, -4);
-        ctx.lineTo(25, 0);
-        ctx.lineTo(15, 4);
-        ctx.closePath();
-        ctx.fill();
-        
-        // Fletching feathers
-        ctx.fillStyle = '#F00';
-        ctx.beginPath();
-        ctx.moveTo(-15, -3);
-        ctx.lineTo(-25, -6);
-        ctx.lineTo(-15, -1);
-        ctx.closePath();
-        ctx.fill();
-        ctx.beginPath();
-        ctx.moveTo(-15, 3);
-        ctx.lineTo(-25, 6);
-        ctx.lineTo(-15, 1);
-        ctx.closePath();
-        ctx.fill();
-        
-        // Center feather
-        ctx.fillStyle = '#FFF';
-        ctx.beginPath();
-        ctx.moveTo(-15, 0);
-        ctx.lineTo(-22, -2);
-        ctx.lineTo(-22, 2);
-        ctx.closePath();
-        ctx.fill();
-        
-        ctx.restore();
+        const img = projectileImages['crossbow'];
+        if (img && img.complete && img.naturalWidth > 0) {
+            ctx.save();
+            ctx.translate(proj.x, proj.y);
+            ctx.rotate(proj.angle);
+            ctx.drawImage(img, -15, -4, 30, 8);
+            ctx.restore();
+        } else {
+            ctx.save();
+            ctx.translate(proj.x, proj.y);
+            ctx.rotate(proj.angle);
+            // Arrow shaft
+            ctx.fillStyle = '#8B4513';
+            ctx.fillRect(-15, -1, 30, 2);
+            // Arrow head
+            ctx.fillStyle = '#C0C0C0';
+            ctx.beginPath();
+            ctx.moveTo(15, -4); ctx.lineTo(25, 0); ctx.lineTo(15, 4);
+            ctx.closePath();
+            ctx.fill();
+            // Fletching
+            ctx.fillStyle = '#F00';
+            ctx.beginPath();
+            ctx.moveTo(-15, -3); ctx.lineTo(-25, -6); ctx.lineTo(-15, -1);
+            ctx.closePath();
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(-15, 3); ctx.lineTo(-25, 6); ctx.lineTo(-15, 1);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+        }
     },
     
     drawThrownTridentProjectile(ctx, proj) {
@@ -504,14 +499,9 @@ const Projectiles = {
         ctx.strokeStyle = '#FFD700';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(0, -15);
-        ctx.lineTo(-6, -25);
-        ctx.lineTo(0, -20);
-        ctx.moveTo(0, -15);
-        ctx.lineTo(6, -25);
-        ctx.lineTo(0, -20);
-        ctx.moveTo(0, -15);
-        ctx.lineTo(0, -28);
+        ctx.moveTo(0, -15); ctx.lineTo(-6, -25); ctx.lineTo(0, -20);
+        ctx.moveTo(0, -15); ctx.lineTo(6, -25); ctx.lineTo(0, -20);
+        ctx.moveTo(0, -15); ctx.lineTo(0, -28);
         ctx.stroke();
         
         ctx.restore();
@@ -541,14 +531,9 @@ const Projectiles = {
         ctx.strokeStyle = '#FFD700';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(0, -20);
-        ctx.lineTo(-8, -30);
-        ctx.lineTo(0, -25);
-        ctx.moveTo(0, -20);
-        ctx.lineTo(8, -30);
-        ctx.lineTo(0, -25);
-        ctx.moveTo(0, -20);
-        ctx.lineTo(0, -32);
+        ctx.moveTo(0, -20); ctx.lineTo(-8, -30); ctx.lineTo(0, -25);
+        ctx.moveTo(0, -20); ctx.lineTo(8, -30); ctx.lineTo(0, -25);
+        ctx.moveTo(0, -20); ctx.lineTo(0, -32);
         ctx.stroke();
         
         ctx.restore();
@@ -563,30 +548,21 @@ const Projectiles = {
     
     drawBoomerang(ctx, proj) {
         proj.rotation = (proj.rotation || 0) + 0.1;
-        const img = projectileImages['scythe']; // Boomerang uses scythe image or custom
-        if (img && img.complete && img.naturalWidth > 0) {
-            ctx.save();
-            ctx.translate(proj.x, proj.y);
-            ctx.rotate(proj.rotation);
-            ctx.drawImage(img, -20, -20, 40, 40);
-            ctx.restore();
-        } else {
-            ctx.save();
-            ctx.translate(proj.x, proj.y);
-            ctx.rotate(proj.rotation);
-            ctx.shadowColor = '#8B4513';
-            ctx.shadowBlur = 10;
-            ctx.fillStyle = '#8B4513';
-            ctx.strokeStyle = '#654321';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(0, -5); ctx.lineTo(20, -10); ctx.lineTo(25, 0);
-            ctx.lineTo(20, 10); ctx.lineTo(0, 5);
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
-            ctx.restore();
-        }
+        ctx.save();
+        ctx.translate(proj.x, proj.y);
+        ctx.rotate(proj.rotation);
+        ctx.shadowColor = '#8B4513';
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = '#8B4513';
+        ctx.strokeStyle = '#654321';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, -5); ctx.lineTo(20, -10); ctx.lineTo(25, 0);
+        ctx.lineTo(20, 10); ctx.lineTo(0, 5);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
     },
     
     drawKnife(ctx, proj) {
