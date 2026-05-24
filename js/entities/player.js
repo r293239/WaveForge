@@ -46,11 +46,6 @@ const Player = {
     explosiveKills: false,
     goldMagnet: false,
     
-    // Weapon control
-    manualWeaponIndex: -1,
-    manualFire: false,
-    mobileControls: null,
-    
     // Input
     keys: { w: false, a: false, s: false, d: false, up: false, down: false, left: false, right: false },
     joystickActive: false,
@@ -62,7 +57,7 @@ const Player = {
     init() {
         this.reset();
         this.setupInput();
-        this.createMobileControls();
+        this.createMobileButtons();
     },
     
     reset() {
@@ -111,8 +106,6 @@ const Player = {
         this.knockback = false;
         this.explosiveKills = false;
         this.goldMagnet = false;
-        this.manualWeaponIndex = -1;
-        this.manualFire = false;
         
         if (this.bloodContractInterval) {
             clearInterval(this.bloodContractInterval);
@@ -120,152 +113,28 @@ const Player = {
         }
     },
     
-    createMobileControls() {
-        // Only create on touch devices
+    createMobileButtons() {
         if (!('ontouchstart' in window)) return;
         
-        this.mobileControls = document.createElement('div');
-        this.mobileControls.id = 'mobileWeaponControls';
-        this.mobileControls.style.cssText = `
-            position: fixed;
-            bottom: 30px;
-            right: 30px;
-            z-index: 200;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        `;
-        
-        // Fire button
-        const fireBtn = document.createElement('button');
-        fireBtn.id = 'mobileFireBtn';
-        fireBtn.textContent = '🔥 Fire';
-        fireBtn.style.cssText = `
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
-            background: rgba(255,107,107,0.7);
-            color: white;
-            border: 3px solid #ff6b6b;
-            font-size: 1rem;
-            font-weight: bold;
-            cursor: pointer;
-            -webkit-tap-highlight-color: transparent;
-            user-select: none;
-        `;
-        fireBtn.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            this.manualFire = true;
-        });
-        fireBtn.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            this.manualFire = false;
-        });
+        const container = document.createElement('div');
+        container.style.cssText = 'position:fixed;bottom:30px;right:30px;z-index:200;display:flex;gap:10px;';
         
         // Reload button
         const reloadBtn = document.createElement('button');
-        reloadBtn.id = 'mobileReloadBtn';
-        reloadBtn.textContent = '🔄 Reload';
-        reloadBtn.style.cssText = `
-            width: 70px;
-            height: 70px;
-            border-radius: 50%;
-            background: rgba(255,215,0,0.7);
-            color: black;
-            border: 3px solid #ffd700;
-            font-size: 0.8rem;
-            font-weight: bold;
-            cursor: pointer;
-            -webkit-tap-highlight-color: transparent;
-            user-select: none;
-        `;
+        reloadBtn.textContent = '🔄';
+        reloadBtn.style.cssText = 'width:60px;height:60px;border-radius:50%;background:rgba(255,215,0,0.7);border:3px solid #ffd700;font-size:1.5rem;cursor:pointer;';
         reloadBtn.addEventListener('touchstart', (e) => {
             e.preventDefault();
-            if (this.manualWeaponIndex >= 0) {
-                const weapon = this.weapons[this.manualWeaponIndex];
-                if (weapon && weapon.usesAmmo && !weapon.isReloading && !weapon.isThrowable) {
-                    weapon.startReload();
-                }
-            } else {
-                // Reload all in auto mode
-                this.weapons.forEach(w => {
-                    if (w.usesAmmo && !w.isReloading && !w.isThrowable) w.startReload();
-                });
-            }
-        });
-        
-        // Weapon selector buttons
-        const selectorContainer = document.createElement('div');
-        selectorContainer.style.cssText = `
-            display: flex;
-            gap: 5px;
-            flex-wrap: wrap;
-            max-width: 200px;
-            justify-content: center;
-        `;
-        
-        for (let i = 0; i < 6; i++) {
-            const slotBtn = document.createElement('button');
-            slotBtn.className = 'mobile-weapon-slot';
-            slotBtn.textContent = i + 1;
-            slotBtn.style.cssText = `
-                width: 40px;
-                height: 40px;
-                border-radius: 50%;
-                background: rgba(60,60,120,0.7);
-                color: white;
-                border: 2px solid #5555aa;
-                font-size: 0.8rem;
-                font-weight: bold;
-                cursor: pointer;
-                -webkit-tap-highlight-color: transparent;
-                user-select: none;
-                transition: all 0.2s;
-            `;
-            
-            const idx = i;
-            slotBtn.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                if (idx < this.weapons.length) {
-                    this.manualWeaponIndex = (this.manualWeaponIndex === idx) ? -1 : idx;
-                    this.updateMobileSlotStyles();
-                    Messages.show(this.manualWeaponIndex >= 0 ? 
-                        `Manual: ${this.weapons[this.manualWeaponIndex].name}` : 
-                        'Auto-attack mode');
-                }
+            Player.weapons.forEach(w => {
+                if (w.usesAmmo && !w.isReloading && !w.isThrowable) w.startReload();
             });
-            
-            selectorContainer.appendChild(slotBtn);
-        }
-        
-        this.mobileControls.appendChild(selectorContainer);
-        this.mobileControls.appendChild(reloadBtn);
-        this.mobileControls.appendChild(fireBtn);
-        document.body.appendChild(this.mobileControls);
-    },
-    
-    updateMobileSlotStyles() {
-        if (!this.mobileControls) return;
-        const slots = this.mobileControls.querySelectorAll('.mobile-weapon-slot');
-        slots.forEach((slot, i) => {
-            if (i === this.manualWeaponIndex) {
-                slot.style.background = 'rgba(255,215,0,0.9)';
-                slot.style.color = 'black';
-                slot.style.border = '3px solid #ffd700';
-            } else if (i < this.weapons.length) {
-                slot.style.background = 'rgba(255,107,107,0.7)';
-                slot.style.color = 'white';
-                slot.style.border = '2px solid #ff6b6b';
-            } else {
-                slot.style.background = 'rgba(60,60,120,0.7)';
-                slot.style.color = 'white';
-                slot.style.border = '2px solid #5555aa';
-            }
         });
+        
+        container.appendChild(reloadBtn);
+        document.body.appendChild(container);
     },
     
     setupInput() {
-        // Keyboard
         document.addEventListener('keydown', (e) => {
             const key = e.key.toLowerCase();
             switch (key) {
@@ -274,32 +143,10 @@ const Player = {
                 case 'a': case 'arrowleft': this.keys.a = true; this.keys.left = true; e.preventDefault(); break;
                 case 'd': case 'arrowright': this.keys.d = true; this.keys.right = true; e.preventDefault(); break;
             }
-            
-            // Weapon control - press 1-6 to select manual control
-            if (key >= '1' && key <= '6') {
-                const idx = parseInt(key) - 1;
-                if (idx < this.weapons.length) {
-                    this.manualWeaponIndex = (this.manualWeaponIndex === idx) ? -1 : idx;
-                    this.updateMobileSlotStyles();
-                    Messages.show(this.manualWeaponIndex >= 0 ? 
-                        `Manual: ${this.weapons[this.manualWeaponIndex].name} (F to fire, R to reload)` : 
-                        'Auto-attack mode');
-                } else {
-                    Messages.show('No weapon in that slot!');
-                }
-            }
-            
-            // Manual fire
-            if (key === 'f' && this.manualWeaponIndex >= 0) {
-                this.manualFire = true;
-            }
-            
-            // Manual reload
-            if (key === 'r' && this.manualWeaponIndex >= 0) {
-                const weapon = this.weapons[this.manualWeaponIndex];
-                if (weapon && weapon.usesAmmo && !weapon.isReloading && !weapon.isThrowable) {
-                    weapon.startReload();
-                }
+            if (key === 'r') {
+                this.weapons.forEach(w => {
+                    if (w.usesAmmo && !w.isReloading && !w.isThrowable) w.startReload();
+                });
             }
         });
         
@@ -313,18 +160,11 @@ const Player = {
             }
         });
         
-        // Mouse
         if (Game.canvas) {
             Game.canvas.addEventListener('mousemove', (e) => {
                 const rect = Game.canvas.getBoundingClientRect();
                 this.mouseX = e.clientX - rect.left;
                 this.mouseY = e.clientY - rect.top;
-            });
-            
-            Game.canvas.addEventListener('click', (e) => {
-                if (this.manualWeaponIndex >= 0) {
-                    this.manualFire = true;
-                }
             });
         }
     },
@@ -332,7 +172,6 @@ const Player = {
     update(deltaTime) {
         if (!this.entity) return;
         
-        // Calculate movement
         let moveX = 0, moveY = 0;
         if (this.keys.w || this.keys.up) moveY -= 1;
         if (this.keys.s || this.keys.down) moveY += 1;
@@ -344,85 +183,37 @@ const Player = {
             moveY += this.joystickY;
         }
         
-        // Normalize and apply speed
         if (moveX !== 0 || moveY !== 0) {
             const length = Math.hypot(moveX, moveY);
             moveX = (moveX / length) * this.speed;
             moveY = (moveY / length) * this.speed;
-            
             this.entity.x += moveX;
             this.entity.y += moveY;
             this.lastFacingAngle = Math.atan2(moveY, moveX);
         }
         
-        // Clamp to arena
         Physics.clampToArena(this.entity);
         
-        // Update facing angle
         if (this.lastFacingAngle !== undefined && (moveX !== 0 || moveY !== 0)) {
             this.facingAngle = this.lastFacingAngle;
         } else {
             this.facingAngle = Math.atan2(this.mouseY - this.entity.y, this.mouseX - this.entity.x);
         }
         
-        // Health regeneration
         const currentTime = Date.now();
         if ((this.healthRegen > 0 || this.healthRegenPercent > 0) && 
-            currentTime - this.lastRegen >= 1000 && 
-            this.health < this.maxHealth) {
+            currentTime - this.lastRegen >= 1000 && this.health < this.maxHealth) {
             let regenAmount = this.healthRegen;
-            if (this.healthRegenPercent > 0) {
-                regenAmount += Math.floor(this.maxHealth * this.healthRegenPercent);
-            }
+            if (this.healthRegenPercent > 0) regenAmount += Math.floor(this.maxHealth * this.healthRegenPercent);
             this.heal(Math.max(1, regenAmount));
             this.lastRegen = currentTime;
-        }
-        
-        // Manual weapon fire
-        if (this.manualFire && this.manualWeaponIndex >= 0 && this.manualWeaponIndex < this.weapons.length) {
-            this.manualFire = false;
-            const weapon = this.weapons[this.manualWeaponIndex];
-            if (weapon && weapon.canAttack(currentTime)) {
-                const targetAngle = Math.atan2(this.mouseY - this.entity.y, this.mouseX - this.entity.x);
-                const targetX = this.entity.x + Math.cos(targetAngle) * weapon.range;
-                const targetY = this.entity.y + Math.sin(targetAngle) * weapon.range;
-                
-                const attackResult = weapon.attack(this.entity.x, this.entity.y, targetX, targetY);
-                
-                if (attackResult) {
-                    if (Array.isArray(attackResult)) {
-                        for (let proj of attackResult) {
-                            proj.weaponRef = weapon;
-                            Projectiles.active.push(proj);
-                        }
-                    } else if (attackResult.type === 'ranged') {
-                        attackResult.weaponRef = weapon;
-                        Projectiles.active.push(attackResult);
-                    } else if (attackResult.type === 'melee') {
-                        attackResult.attackedMonsters = new Set();
-                        attackResult.weaponRef = weapon;
-                        this.meleeAttacks.push(attackResult);
-                    }
-                }
-            }
         }
     },
     
     takeDamage(amount, source = null) {
-        if (Math.random() < this.dodgeChance) {
-            Messages.show('DODGE!');
-            return false;
-        }
-        
-        if (this.firstHitActive) {
-            amount *= 0.5;
-            this.firstHitActive = false;
-            Messages.show('Runic Plate absorbed 50% damage!');
-        }
-        
-        if (this.damageReduction > 0) {
-            amount *= (1 - this.damageReduction);
-        }
+        if (Math.random() < this.dodgeChance) { Messages.show('DODGE!'); return false; }
+        if (this.firstHitActive) { amount *= 0.5; this.firstHitActive = false; }
+        if (this.damageReduction > 0) amount *= (1 - this.damageReduction);
         
         this.health -= amount;
         
@@ -481,7 +272,6 @@ const Player = {
         }
         const weapon = WeaponBase.create(weaponData, tier);
         this.weapons.push(weapon);
-        this.updateMobileSlotStyles();
         HUD.updateWeapons();
         return true;
     },
@@ -490,12 +280,6 @@ const Player = {
         if (index < 0 || index >= this.weapons.length) return null;
         const weapon = this.weapons[index];
         this.weapons.splice(index, 1);
-        if (this.manualWeaponIndex === index) {
-            this.manualWeaponIndex = -1;
-        } else if (this.manualWeaponIndex > index) {
-            this.manualWeaponIndex--;
-        }
-        this.updateMobileSlotStyles();
         HUD.updateWeapons();
         return weapon;
     },
@@ -509,22 +293,15 @@ const Player = {
             Messages.show('Can only use consumables during waves!');
             return;
         }
-        
         const consumable = this.consumables[index];
         if (!consumable) return;
         
         switch (consumable.id) {
-            case 'health_potion':
-                this.heal(Math.floor(this.maxHealth * 0.25));
-                break;
+            case 'health_potion': this.heal(Math.floor(this.maxHealth * 0.25)); break;
             case 'ammo_pack':
                 this.weapons.forEach(w => {
-                    if (w.usesAmmo && !w.isThrowable) {
-                        w.currentAmmo = w.magazineSize;
-                        w.isReloading = false;
-                    }
+                    if (w.usesAmmo && !w.isThrowable) { w.currentAmmo = w.magazineSize; w.isReloading = false; }
                 });
-                Messages.show('All weapons reloaded!');
                 break;
             case 'rage_potion':
                 this.damageMultiplier *= 1.5;
@@ -534,11 +311,11 @@ const Player = {
                 if (this.entity) {
                     Effects.explosion(this.entity.x, this.entity.y, 150, '#FF4500');
                     for (let i = Monsters.active.length - 1; i >= 0; i--) {
-                        const monster = Monsters.active[i];
-                        if (Physics.distance(this.entity, monster) < 150 + monster.radius) {
-                            monster.health -= 100;
-                            Effects.damageIndicator(monster.x, monster.y, 100, true);
-                            if (monster.health <= 0) Monsters.handleDeath(monster, i);
+                        const m = Monsters.active[i];
+                        if (Physics.distance(this.entity, m) < 150 + m.radius) {
+                            m.health -= 100;
+                            Effects.damageIndicator(m.x, m.y, 100, true);
+                            if (m.health <= 0) Monsters.handleDeath(m, i);
                         }
                     }
                 }
@@ -550,14 +327,12 @@ const Player = {
                     weapon.tier++;
                     weapon.applyTierBonuses();
                     Messages.show(`${weapon.name} upgraded to Tier ${weapon.tier}!`);
-                    HUD.updateWeapons();
                 }
                 break;
         }
         
         if (consumable.count > 1) consumable.count--;
         else this.consumables.splice(index, 1);
-        
         HUD.updateConsumables();
     },
     
@@ -642,11 +417,6 @@ const Player = {
             ctx.beginPath();
             ctx.arc(0, 0, this.entity.radius + 8 + Math.sin(Date.now() * 0.01) * 3, 0, Math.PI * 2);
             ctx.stroke();
-        }
-        
-        if (this.manualWeaponIndex >= 0) {
-            ctx.fillStyle = '#FFD700'; ctx.font = 'bold 10px Arial'; ctx.textAlign = 'center';
-            ctx.fillText('MANUAL', 0, this.entity.radius + 20);
         }
         
         ctx.restore();
