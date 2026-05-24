@@ -76,7 +76,6 @@ class WeaponInstance {
             this.shockwaveIntensity = weaponData.shockwaveIntensity || 1;
         }
         
-        // Upgrade properties
         this.poisonDamage = null;
         this.poisonDuration = null;
         this.fireDamage = null;
