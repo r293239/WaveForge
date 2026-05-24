@@ -836,4 +836,39 @@ const Monsters = {
         const ctx = Game.ctx;
         const currentTime = Date.now();
         
-        for (let
+        for (let indicator of this.spawnIndicators) {
+            const elapsed = currentTime - indicator.startTime;
+            const progress = elapsed / indicator.timer;
+            if (elapsed > indicator.timer) continue;
+            
+            const pulseScale = 1 + Math.sin(progress * Math.PI * 4) * 0.2;
+            const alpha = 1 - progress * 0.5;
+            
+            ctx.save();
+            ctx.translate(indicator.x, indicator.y);
+            
+            if (indicator.isBoss) {
+                ctx.strokeStyle = `rgba(255,215,0,${alpha})`;
+                ctx.lineWidth = 4;
+                ctx.shadowColor = '#ffd700';
+                ctx.shadowBlur = 20 * alpha;
+                ctx.rotate(elapsed * 0.002);
+                ctx.beginPath(); ctx.arc(0, 0, 40 * pulseScale, 0, Math.PI * 2); ctx.stroke();
+                ctx.beginPath(); ctx.arc(0, 0, 25, 0, Math.PI * 2); ctx.stroke();
+                ctx.rotate(-elapsed * 0.002);
+                ctx.beginPath(); ctx.moveTo(-30, -30); ctx.lineTo(30, 30); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(30, -30); ctx.lineTo(-30, 30); ctx.stroke();
+            } else {
+                ctx.strokeStyle = `rgba(255,0,0,${alpha})`;
+                ctx.lineWidth = 3;
+                ctx.shadowColor = '#f00';
+                ctx.shadowBlur = 10 * alpha;
+                ctx.beginPath(); ctx.arc(0, 0, 25 * pulseScale, 0, Math.PI * 2); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(-15, -15); ctx.lineTo(15, 15); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(15, -15); ctx.lineTo(-15, 15); ctx.stroke();
+            }
+            
+            ctx.restore();
+        }
+    }
+};
