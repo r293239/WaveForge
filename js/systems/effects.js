@@ -39,8 +39,16 @@ const Effects = {
     // Death effect
     deathEffect(x, y) {
         this.add({ type: 'death', x, y, color: '#FF0000', duration: 300 });
+        
     },
-    
+        lightningBolt(x1, y1, x2, y2) {
+        this.active.push({
+        type: 'lightning',
+        x1, y1, x2, y2,
+        duration: 300,
+        startTime: Date.now()
+    },
+                         
     // Explosion
     explosion(x, y, radius, color = '#FF4500') {
         this.add({ type: 'explosion', x, y, radius, color, duration: 400 });
@@ -175,6 +183,24 @@ const Effects = {
                         ctx.arc(effect.x + Math.cos(angle) * dist, effect.y + Math.sin(angle) * dist, 3, 0, Math.PI * 2);
                         ctx.fill();
                     }
+                    break;
+                case 'lightning':
+                    const boltAlpha = 1 - progress;
+                    ctx.strokeStyle = `rgba(255,255,100,${boltAlpha})`;
+                    ctx.lineWidth = 2;
+                    ctx.shadowColor = '#FFFF00';
+                    ctx.shadowBlur = 10;
+                    ctx.beginPath();
+                    ctx.moveTo(effect.x1, effect.y1);
+                    const segments = 5;
+                    for (let i = 1; i <= segments; i++) {
+                        const t = i / segments;
+                        const x = effect.x1 + (effect.x2 - effect.x1) * t;
+                        const y = effect.y1 + (effect.y2 - effect.y1) * t + (Math.random() - 0.5) * 20;
+                        ctx.lineTo(x, y);
+                    }
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
                     break;
                     
                 case 'spawn':
