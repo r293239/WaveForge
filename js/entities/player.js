@@ -49,6 +49,7 @@ const Player = {
     // Weapon control
     manualWeaponIndex: -1,
     manualFire: false,
+    mobileControls: null,
     
     // Input
     keys: { w: false, a: false, s: false, d: false, up: false, down: false, left: false, right: false },
@@ -61,6 +62,7 @@ const Player = {
     init() {
         this.reset();
         this.setupInput();
+        this.createMobileControls();
     },
     
     reset() {
@@ -118,6 +120,150 @@ const Player = {
         }
     },
     
+    createMobileControls() {
+        // Only create on touch devices
+        if (!('ontouchstart' in window)) return;
+        
+        this.mobileControls = document.createElement('div');
+        this.mobileControls.id = 'mobileWeaponControls';
+        this.mobileControls.style.cssText = `
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            z-index: 200;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        `;
+        
+        // Fire button
+        const fireBtn = document.createElement('button');
+        fireBtn.id = 'mobileFireBtn';
+        fireBtn.textContent = '🔥 Fire';
+        fireBtn.style.cssText = `
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: rgba(255,107,107,0.7);
+            color: white;
+            border: 3px solid #ff6b6b;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        `;
+        fireBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            this.manualFire = true;
+        });
+        fireBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            this.manualFire = false;
+        });
+        
+        // Reload button
+        const reloadBtn = document.createElement('button');
+        reloadBtn.id = 'mobileReloadBtn';
+        reloadBtn.textContent = '🔄 Reload';
+        reloadBtn.style.cssText = `
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: rgba(255,215,0,0.7);
+            color: black;
+            border: 3px solid #ffd700;
+            font-size: 0.8rem;
+            font-weight: bold;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        `;
+        reloadBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (this.manualWeaponIndex >= 0) {
+                const weapon = this.weapons[this.manualWeaponIndex];
+                if (weapon && weapon.usesAmmo && !weapon.isReloading && !weapon.isThrowable) {
+                    weapon.startReload();
+                }
+            } else {
+                // Reload all in auto mode
+                this.weapons.forEach(w => {
+                    if (w.usesAmmo && !w.isReloading && !w.isThrowable) w.startReload();
+                });
+            }
+        });
+        
+        // Weapon selector buttons
+        const selectorContainer = document.createElement('div');
+        selectorContainer.style.cssText = `
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+            max-width: 200px;
+            justify-content: center;
+        `;
+        
+        for (let i = 0; i < 6; i++) {
+            const slotBtn = document.createElement('button');
+            slotBtn.className = 'mobile-weapon-slot';
+            slotBtn.textContent = i + 1;
+            slotBtn.style.cssText = `
+                width: 40px;
+                height: 40px;
+                border-radius: 50%;
+                background: rgba(60,60,120,0.7);
+                color: white;
+                border: 2px solid #5555aa;
+                font-size: 0.8rem;
+                font-weight: bold;
+                cursor: pointer;
+                -webkit-tap-highlight-color: transparent;
+                user-select: none;
+                transition: all 0.2s;
+            `;
+            
+            const idx = i;
+            slotBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if (idx < this.weapons.length) {
+                    this.manualWeaponIndex = (this.manualWeaponIndex === idx) ? -1 : idx;
+                    this.updateMobileSlotStyles();
+                    Messages.show(this.manualWeaponIndex >= 0 ? 
+                        `Manual: ${this.weapons[this.manualWeaponIndex].name}` : 
+                        'Auto-attack mode');
+                }
+            });
+            
+            selectorContainer.appendChild(slotBtn);
+        }
+        
+        this.mobileControls.appendChild(selectorContainer);
+        this.mobileControls.appendChild(reloadBtn);
+        this.mobileControls.appendChild(fireBtn);
+        document.body.appendChild(this.mobileControls);
+    },
+    
+    updateMobileSlotStyles() {
+        if (!this.mobileControls) return;
+        const slots = this.mobileControls.querySelectorAll('.mobile-weapon-slot');
+        slots.forEach((slot, i) => {
+            if (i === this.manualWeaponIndex) {
+                slot.style.background = 'rgba(255,215,0,0.9)';
+                slot.style.color = 'black';
+                slot.style.border = '3px solid #ffd700';
+            } else if (i < this.weapons.length) {
+                slot.style.background = 'rgba(255,107,107,0.7)';
+                slot.style.color = 'white';
+                slot.style.border = '2px solid #ff6b6b';
+            } else {
+                slot.style.background = 'rgba(60,60,120,0.7)';
+                slot.style.color = 'white';
+                slot.style.border = '2px solid #5555aa';
+            }
+        });
+    },
+    
     setupInput() {
         // Keyboard
         document.addEventListener('keydown', (e) => {
@@ -134,6 +280,7 @@ const Player = {
                 const idx = parseInt(key) - 1;
                 if (idx < this.weapons.length) {
                     this.manualWeaponIndex = (this.manualWeaponIndex === idx) ? -1 : idx;
+                    this.updateMobileSlotStyles();
                     Messages.show(this.manualWeaponIndex >= 0 ? 
                         `Manual: ${this.weapons[this.manualWeaponIndex].name} (F to fire, R to reload)` : 
                         'Auto-attack mode');
@@ -211,16 +358,11 @@ const Player = {
         // Clamp to arena
         Physics.clampToArena(this.entity);
         
-        // Update facing angle (toward mouse or movement direction)
+        // Update facing angle
         if (this.lastFacingAngle !== undefined && (moveX !== 0 || moveY !== 0)) {
             this.facingAngle = this.lastFacingAngle;
         } else {
             this.facingAngle = Math.atan2(this.mouseY - this.entity.y, this.mouseX - this.entity.x);
-        }
-        
-        // Gold magnet - auto collect nearby gold (placeholder for future)
-        if (this.goldMagnet) {
-            // Would auto-collect gold pickups in range
         }
         
         // Health regeneration
@@ -241,7 +383,6 @@ const Player = {
             this.manualFire = false;
             const weapon = this.weapons[this.manualWeaponIndex];
             if (weapon && weapon.canAttack(currentTime)) {
-                // Find target in mouse direction
                 const targetAngle = Math.atan2(this.mouseY - this.entity.y, this.mouseX - this.entity.x);
                 const targetX = this.entity.x + Math.cos(targetAngle) * weapon.range;
                 const targetY = this.entity.y + Math.sin(targetAngle) * weapon.range;
@@ -268,27 +409,23 @@ const Player = {
     },
     
     takeDamage(amount, source = null) {
-        // Dodge chance
         if (Math.random() < this.dodgeChance) {
             Messages.show('DODGE!');
             return false;
         }
         
-        // First hit reduction
         if (this.firstHitActive) {
             amount *= 0.5;
             this.firstHitActive = false;
             Messages.show('Runic Plate absorbed 50% damage!');
         }
         
-        // Damage reduction
         if (this.damageReduction > 0) {
             amount *= (1 - this.damageReduction);
         }
         
         this.health -= amount;
         
-        // Thorns damage
         if (this.thornsDamage > 0 && source && source.health !== undefined) {
             const thornsDmg = Math.floor(amount * this.thornsDamage);
             if (thornsDmg > 0) {
@@ -303,7 +440,6 @@ const Player = {
         
         Effects.damageIndicator(this.entity.x, this.entity.y, Math.floor(amount), false);
         
-        // Check death
         if (this.health <= 0) {
             if (this.guardianAngel && !this.guardianAngelUsed) {
                 this.guardianAngelUsed = true;
@@ -317,7 +453,6 @@ const Player = {
             return true;
         }
         
-        // Berserker ring
         if (this.berserkerRing) {
             const hpPercent = this.health / this.maxHealth;
             this.damageMultiplier = 1.0 + (1 - hpPercent) * 0.5;
@@ -346,6 +481,7 @@ const Player = {
         }
         const weapon = WeaponBase.create(weaponData, tier);
         this.weapons.push(weapon);
+        this.updateMobileSlotStyles();
         HUD.updateWeapons();
         return true;
     },
@@ -359,6 +495,7 @@ const Player = {
         } else if (this.manualWeaponIndex > index) {
             this.manualWeaponIndex--;
         }
+        this.updateMobileSlotStyles();
         HUD.updateWeapons();
         return weapon;
     },
@@ -379,7 +516,6 @@ const Player = {
         switch (consumable.id) {
             case 'health_potion':
                 this.heal(Math.floor(this.maxHealth * 0.25));
-                Messages.show(`Used Health Potion!`);
                 break;
             case 'ammo_pack':
                 this.weapons.forEach(w => {
@@ -392,11 +528,7 @@ const Player = {
                 break;
             case 'rage_potion':
                 this.damageMultiplier *= 1.5;
-                Messages.show('RAGE! +50% damage for 10s');
-                setTimeout(() => {
-                    this.damageMultiplier /= 1.5;
-                    Messages.show('Rage ended');
-                }, 10000);
+                setTimeout(() => { this.damageMultiplier /= 1.5; }, 10000);
                 break;
             case 'bomb':
                 if (this.entity) {
@@ -409,14 +541,12 @@ const Player = {
                             if (monster.health <= 0) Monsters.handleDeath(monster, i);
                         }
                     }
-                    Messages.show('Boom!');
                 }
                 break;
             case 'exp_scroll':
                 const upgradable = this.weapons.filter(w => w.tier < 5);
                 if (upgradable.length > 0) {
                     const weapon = upgradable[Math.floor(Math.random() * upgradable.length)];
-                    const oldTier = weapon.tier;
                     weapon.tier++;
                     weapon.applyTierBonuses();
                     Messages.show(`${weapon.name} upgraded to Tier ${weapon.tier}!`);
@@ -425,11 +555,8 @@ const Player = {
                 break;
         }
         
-        if (consumable.count > 1) {
-            consumable.count--;
-        } else {
-            this.consumables.splice(index, 1);
-        }
+        if (consumable.count > 1) consumable.count--;
+        else this.consumables.splice(index, 1);
         
         HUD.updateConsumables();
     },
@@ -441,7 +568,6 @@ const Player = {
         ctx.save();
         ctx.translate(this.entity.x, this.entity.y);
         
-        // Player body
         ctx.shadowColor = 'rgba(255, 107, 107, 0.5)';
         ctx.shadowBlur = 15;
         ctx.fillStyle = this.entity.color;
@@ -456,7 +582,6 @@ const Player = {
         ctx.arc(0, 0, this.entity.radius, 0, Math.PI * 2);
         ctx.stroke();
         
-        // Eyes
         ctx.save();
         ctx.rotate(this.facingAngle);
         ctx.fillStyle = '#FFF';
@@ -465,27 +590,19 @@ const Player = {
         ctx.beginPath(); ctx.arc(8, -5, 4, 0, Math.PI * 2); ctx.fill();
         ctx.beginPath(); ctx.arc(8, 5, 4, 0, Math.PI * 2); ctx.fill();
         
-        // Pupils (look toward mouse)
         ctx.fillStyle = '#000';
         ctx.shadowBlur = 0;
         const mouseAngle = Math.atan2(this.mouseY - this.entity.y, this.mouseX - this.entity.x) - this.facingAngle;
-        const pupilOffsetX = Math.cos(mouseAngle) * 1.5;
-        const pupilOffsetY = Math.sin(mouseAngle) * 1.5;
-        ctx.beginPath(); ctx.arc(8 + pupilOffsetX, -5 + pupilOffsetY, 2, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(8 + pupilOffsetX, 5 + pupilOffsetY, 2, 0, Math.PI * 2); ctx.fill();
+        const pdx = Math.cos(mouseAngle) * 1.5;
+        const pdy = Math.sin(mouseAngle) * 1.5;
+        ctx.beginPath(); ctx.arc(8 + pdx, -5 + pdy, 2, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(8 + pdx, 5 + pdy, 2, 0, Math.PI * 2); ctx.fill();
         
-        // Mouth
         ctx.strokeStyle = '#000';
         ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(12, -1);
-        ctx.lineTo(18, 0);
-        ctx.moveTo(12, 1);
-        ctx.lineTo(18, 0);
-        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(12, -1); ctx.lineTo(18, 0); ctx.moveTo(12, 1); ctx.lineTo(18, 0); ctx.stroke();
         ctx.restore();
         
-        // Weapon indicator (points toward mouse)
         ctx.save();
         ctx.rotate(this.facingAngle);
         ctx.strokeStyle = '#fc0';
@@ -503,52 +620,32 @@ const Player = {
         ctx.fill();
         ctx.restore();
         
-        // Status effect indicators
         if (this.firstHitReduction && this.firstHitActive) {
-            ctx.strokeStyle = '#0FF';
-            ctx.lineWidth = 3;
-            ctx.shadowColor = '#0FF';
-            ctx.shadowBlur = 20;
-            ctx.beginPath();
-            ctx.arc(0, 0, this.entity.radius + 10, 0, Math.PI * 2);
-            ctx.stroke();
+            ctx.strokeStyle = '#0FF'; ctx.lineWidth = 3;
+            ctx.shadowColor = '#0FF'; ctx.shadowBlur = 20;
+            ctx.beginPath(); ctx.arc(0, 0, this.entity.radius + 10, 0, Math.PI * 2); ctx.stroke();
         }
         
         if (this.bloodContract) {
-            ctx.strokeStyle = '#8B0000';
-            ctx.lineWidth = 2;
-            ctx.shadowColor = '#8B0000';
-            ctx.shadowBlur = 20;
+            ctx.strokeStyle = '#8B0000'; ctx.lineWidth = 2;
+            ctx.shadowColor = '#8B0000'; ctx.shadowBlur = 20;
             ctx.beginPath();
             ctx.arc(0, 0, this.entity.radius + 5 + Math.sin(Date.now() * 0.005) * 2, 0, Math.PI * 2);
             ctx.stroke();
-            ctx.fillStyle = '#8B0000';
-            ctx.font = 'bold 12px Arial';
-            ctx.textAlign = 'center';
+            ctx.fillStyle = '#8B0000'; ctx.font = 'bold 12px Arial'; ctx.textAlign = 'center';
             ctx.fillText(`${this.bloodContractStacks}`, 0, -this.entity.radius - 10);
         }
         
         if (this.inSlowField) {
-            ctx.strokeStyle = '#6464ff';
-            ctx.lineWidth = 3;
-            ctx.shadowColor = '#6464ff';
-            ctx.shadowBlur = 15;
+            ctx.strokeStyle = '#6464ff'; ctx.lineWidth = 3;
+            ctx.shadowColor = '#6464ff'; ctx.shadowBlur = 15;
             ctx.beginPath();
             ctx.arc(0, 0, this.entity.radius + 8 + Math.sin(Date.now() * 0.01) * 3, 0, Math.PI * 2);
             ctx.stroke();
-            if (this.slowFieldTicks > 0) {
-                ctx.fillStyle = 'rgba(255,100,100,0.9)';
-                ctx.font = 'bold 14px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText(`-${this.slowFieldTicks} SPD`, 0, -this.entity.radius - 20);
-            }
         }
         
-        // Manual weapon indicator
         if (this.manualWeaponIndex >= 0) {
-            ctx.fillStyle = '#FFD700';
-            ctx.font = 'bold 10px Arial';
-            ctx.textAlign = 'center';
+            ctx.fillStyle = '#FFD700'; ctx.font = 'bold 10px Arial'; ctx.textAlign = 'center';
             ctx.fillText('MANUAL', 0, this.entity.radius + 20);
         }
         
