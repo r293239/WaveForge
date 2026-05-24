@@ -57,7 +57,7 @@ const Player = {
     init() {
         this.reset();
         this.setupInput();
-        this.createMobileButtons();
+        this.createMobileReloadButton();
     },
     
     reset() {
@@ -113,28 +113,43 @@ const Player = {
         }
     },
     
-    createMobileButtons() {
+    createMobileReloadButton() {
+        // Only create on touch devices (iPad/iPhone)
         if (!('ontouchstart' in window)) return;
         
-        const container = document.createElement('div');
-        container.style.cssText = 'position:fixed;bottom:30px;right:30px;z-index:200;display:flex;gap:10px;';
+        const btn = document.createElement('button');
+        btn.textContent = '🔄';
+        btn.style.cssText = `
+            position: fixed;
+            bottom: 120px;
+            right: 30px;
+            z-index: 200;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: rgba(255, 215, 0, 0.7);
+            border: 3px solid #ffd700;
+            font-size: 1.8rem;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        `;
         
-        // Reload button
-        const reloadBtn = document.createElement('button');
-        reloadBtn.textContent = '🔄';
-        reloadBtn.style.cssText = 'width:60px;height:60px;border-radius:50%;background:rgba(255,215,0,0.7);border:3px solid #ffd700;font-size:1.5rem;cursor:pointer;';
-        reloadBtn.addEventListener('touchstart', (e) => {
+        btn.addEventListener('touchstart', (e) => {
             e.preventDefault();
+            e.stopPropagation();
             Player.weapons.forEach(w => {
-                if (w.usesAmmo && !w.isReloading && !w.isThrowable) w.startReload();
+                if (w.usesAmmo && !w.isReloading && !w.isThrowable) {
+                    w.startReload();
+                }
             });
         });
         
-        container.appendChild(reloadBtn);
-        document.body.appendChild(container);
+        document.body.appendChild(btn);
     },
     
     setupInput() {
+        // Keyboard (works with external keyboard on iPad)
         document.addEventListener('keydown', (e) => {
             const key = e.key.toLowerCase();
             switch (key) {
@@ -160,7 +175,24 @@ const Player = {
             }
         });
         
+        // Touch/mouse for aiming direction
         if (Game.canvas) {
+            Game.canvas.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                const touch = e.touches[0];
+                const rect = Game.canvas.getBoundingClientRect();
+                this.mouseX = touch.clientX - rect.left;
+                this.mouseY = touch.clientY - rect.top;
+            });
+            
+            Game.canvas.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                const touch = e.touches[0];
+                const rect = Game.canvas.getBoundingClientRect();
+                this.mouseX = touch.clientX - rect.left;
+                this.mouseY = touch.clientY - rect.top;
+            });
+            
             Game.canvas.addEventListener('mousemove', (e) => {
                 const rect = Game.canvas.getBoundingClientRect();
                 this.mouseX = e.clientX - rect.left;
