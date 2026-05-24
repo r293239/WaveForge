@@ -76,6 +76,7 @@ class WeaponInstance {
             this.shockwaveIntensity = weaponData.shockwaveIntensity || 1;
         }
         
+        // Upgrade properties
         this.poisonDamage = null;
         this.poisonDuration = null;
         this.fireDamage = null;
@@ -90,6 +91,13 @@ class WeaponInstance {
         this.explosiveDamage = 0;
         this.explosiveRadius = 0;
         this.forkLaser = false;
+        
+        // Trident properties
+        this.lightningStrike = false;
+        this.isThrown = false;
+        this.thrownX = 0;
+        this.thrownY = 0;
+        this.pickupRange = 40;
         
         this.tierMultipliers = weaponData.tierMultipliers || {};
         this.applyTierBonuses();
