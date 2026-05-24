@@ -4,89 +4,87 @@
 
 const MeleeWeapons = {
     createAttack(weapon, playerX, playerY, angle, currentTime) {
+        // Dual daggers
         if (weapon.dualStrike) {
             return {
-                type: 'melee',
-                x: playerX, y: playerY,
-                radius: weapon.range,
-                damage: weapon.baseDamage,
-                color: weapon.swingColor,
-                startTime: currentTime,
-                duration: 200,
-                swingAngle: weapon.swingAngle,
-                meleeType: 'dual',
-                angle: angle,
+                type: 'melee', x: playerX, y: playerY,
+                radius: weapon.range, damage: weapon.baseDamage,
+                color: weapon.swingColor, startTime: currentTime,
+                duration: 200, swingAngle: weapon.swingAngle,
+                meleeType: 'dual', angle: angle,
                 pierceCount: weapon.pierceCount,
-                weaponId: weapon.id,
-                animation: weapon.animation,
-                trailColor: weapon.trailColor,
-                sparkleColor: weapon.sparkleColor,
-                bladeColor: weapon.bladeColor,
-                hiltColor: weapon.hiltColor,
-                gripColor: weapon.gripColor,
-                dualStrike: true,
-                weaponRef: weapon,
-                attackedMonsters: new Set()
+                weaponId: weapon.id, animation: weapon.animation,
+                trailColor: weapon.trailColor, sparkleColor: weapon.sparkleColor,
+                bladeColor: weapon.bladeColor, hiltColor: weapon.hiltColor,
+                gripColor: weapon.gripColor, dualStrike: true,
+                weaponRef: weapon, attackedMonsters: new Set()
             };
         }
         
         // Spear/Trident throw mechanic
-        if (weapon.id === 'spear' && !weapon.isThrown) {
-            weapon.isThrown = true;
-            const projectile = {
-                type: 'ranged',
-                x: playerX, y: playerY,
-                startX: playerX, startY: playerY,
-                angle: angle,
-                speed: 12,
-                range: weapon.range * 1.5,
-                damage: weapon.baseDamage * 1.5,
-                color: '#CD7F32',
-                weaponId: weapon.id,
-                animation: 'trident',
-                isThrownTrident: true,
-                pierceCount: weapon.pierceCount,
-                piercedEnemies: [],
-                distanceTraveled: 0,
-                startTime: currentTime,
-                size: 8,
-                weaponRef: weapon,
-                lightningStrike: weapon.lightningStrike
-            };
-            Projectiles.active.push(projectile);
-            return null;
+        if (weapon.id === 'spear') {
+            if (!weapon.isThrown) {
+                // Throw the trident
+                weapon.isThrown = true;
+                const projectile = {
+                    type: 'ranged',
+                    x: playerX, y: playerY,
+                    startX: playerX, startY: playerY,
+                    angle: angle,
+                    speed: 12,
+                    range: weapon.range * 1.5,
+                    damage: weapon.baseDamage * 1.5,
+                    color: '#CD7F32',
+                    weaponId: weapon.id,
+                    animation: 'trident',
+                    isThrownTrident: true,
+                    pierceCount: weapon.pierceCount,
+                    piercedEnemies: [],
+                    distanceTraveled: 0,
+                    startTime: currentTime,
+                    size: 8,
+                    weaponRef: weapon,
+                    lightningStrike: weapon.lightningStrike
+                };
+                Projectiles.active.push(projectile);
+                return null;
+            } else {
+                // Trident is thrown - use weak melee instead
+                return {
+                    type: 'melee', x: playerX, y: playerY,
+                    radius: 30,
+                    damage: weapon.baseDamage * 0.3,
+                    color: weapon.swingColor,
+                    startTime: currentTime,
+                    duration: 200,
+                    swingAngle: 45,
+                    meleeType: 'single',
+                    angle: angle,
+                    pierceCount: 0,
+                    weaponId: weapon.id,
+                    weaponRef: weapon,
+                    attackedMonsters: new Set()
+                };
+            }
         }
         
+        // Normal melee attack
         return {
-            type: 'melee',
-            x: playerX, y: playerY,
-            radius: weapon.range,
-            damage: weapon.baseDamage,
-            color: weapon.swingColor,
-            startTime: currentTime,
-            duration: 300,
-            swingAngle: weapon.swingAngle,
-            meleeType: weapon.meleeType,
-            angle: angle,
+            type: 'melee', x: playerX, y: playerY,
+            radius: weapon.range, damage: weapon.baseDamage,
+            color: weapon.swingColor, startTime: currentTime,
+            duration: 300, swingAngle: weapon.swingAngle,
+            meleeType: weapon.meleeType, angle: angle,
             pierceCount: weapon.pierceCount,
-            weaponId: weapon.id,
-            animation: weapon.animation,
-            trailColor: weapon.trailColor,
-            sparkleColor: weapon.sparkleColor,
-            shockwaveColor: weapon.shockwaveColor,
-            shockwaveIntensity: weapon.shockwaveIntensity,
-            tier: weapon.tier,
-            bladeColor: weapon.bladeColor,
-            hiltColor: weapon.hiltColor,
-            handleColor: weapon.handleColor,
-            headColor: weapon.headColor,
-            edgeColor: weapon.edgeColor,
-            shaftColor: weapon.shaftColor,
-            prongColor: weapon.prongColor,
-            tipColor: weapon.tipColor,
-            gripColor: weapon.gripColor,
-            weaponRef: weapon,
-            attackedMonsters: new Set()
+            weaponId: weapon.id, animation: weapon.animation,
+            trailColor: weapon.trailColor, sparkleColor: weapon.sparkleColor,
+            shockwaveColor: weapon.shockwaveColor, shockwaveIntensity: weapon.shockwaveIntensity,
+            tier: weapon.tier, bladeColor: weapon.bladeColor,
+            hiltColor: weapon.hiltColor, handleColor: weapon.handleColor,
+            headColor: weapon.headColor, edgeColor: weapon.edgeColor,
+            shaftColor: weapon.shaftColor, prongColor: weapon.prongColor,
+            tipColor: weapon.tipColor, gripColor: weapon.gripColor,
+            weaponRef: weapon, attackedMonsters: new Set()
         };
     },
     
