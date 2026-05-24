@@ -3,6 +3,23 @@
 // ============================================
 
 const Projectiles = {
+    // Preload weapon images
+const projectileImages = {};
+const imagePaths = {
+    handgun: 'assets/handgun.png',
+    shotgun: 'assets/shotgun.png',
+    machinegun: 'assets/machine-gun.png',
+    sniper: 'assets/sniper.png',
+    crossbow: 'assets/crossbow.png',
+    scythe: 'assets/scythe.png'
+};
+
+// Load images
+for (let [key, path] of Object.entries(imagePaths)) {
+    const img = new Image();
+    img.src = path;
+    projectileImages[key] = img;
+}
     active: [],
     bossProjectiles: [],
     monsterProjectiles: [],
