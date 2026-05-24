@@ -1,6 +1,12 @@
 // ============================================
-// WAVEFORGE - Base Weapon Class
+// WAVEFORGE - Base Weapon Class & Factory
 // ============================================
+
+const WeaponBase = {
+    create(weaponData, tier = 1) {
+        return new WeaponInstance(weaponData, tier);
+    }
+};
 
 class WeaponInstance {
     constructor(weaponData, tier = 1) {
@@ -48,7 +54,6 @@ class WeaponInstance {
         this.pierceCount = weaponData.pierceCount || 1;
         this.dualStrike = weaponData.dualStrike || false;
         
-        // Visual properties
         this.bladeColor = weaponData.bladeColor || weaponData.swingColor;
         this.hiltColor = weaponData.hiltColor || '#8B4513';
         this.handleColor = weaponData.handleColor || '#654321';
@@ -216,13 +221,8 @@ class WeaponInstance {
     merge(other) {
         if (this.id === other.id && this.tier === other.tier && this.tier < 5) {
             const weaponData = WEAPON_DATA.find(w => w.id === this.id);
-            return new WeaponInstance(weaponData, this.tier + 1);
+            return WeaponBase.create(weaponData, this.tier + 1);
         }
         return null;
     }
 }
-
-// Static factory method
-WeaponInstance.create = function(weaponData, tier = 1) {
-    return new WeaponInstance(weaponData, tier);
-};
