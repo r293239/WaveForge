@@ -46,6 +46,10 @@ const Player = {
     explosiveKills: false,
     goldMagnet: false,
     
+    // Weapon control
+    manualWeaponIndex: -1,
+    manualFire: false,
+    
     // Input
     keys: { w: false, a: false, s: false, d: false, up: false, down: false, left: false, right: false },
     joystickActive: false,
@@ -105,6 +109,8 @@ const Player = {
         this.knockback = false;
         this.explosiveKills = false;
         this.goldMagnet = false;
+        this.manualWeaponIndex = -1;
+        this.manualFire = false;
         
         if (this.bloodContractInterval) {
             clearInterval(this.bloodContractInterval);
@@ -113,13 +119,40 @@ const Player = {
     },
     
     setupInput() {
+        // Keyboard
         document.addEventListener('keydown', (e) => {
             const key = e.key.toLowerCase();
             switch (key) {
-                case 'w': case 'arrowup': this.keys.w = true; this.keys.up = true; break;
-                case 's': case 'arrowdown': this.keys.s = true; this.keys.down = true; break;
-                case 'a': case 'arrowleft': this.keys.a = true; this.keys.left = true; break;
-                case 'd': case 'arrowright': this.keys.d = true; this.keys.right = true; break;
+                case 'w': case 'arrowup': this.keys.w = true; this.keys.up = true; e.preventDefault(); break;
+                case 's': case 'arrowdown': this.keys.s = true; this.keys.down = true; e.preventDefault(); break;
+                case 'a': case 'arrowleft': this.keys.a = true; this.keys.left = true; e.preventDefault(); break;
+                case 'd': case 'arrowright': this.keys.d = true; this.keys.right = true; e.preventDefault(); break;
+            }
+            
+            // Weapon control - press 1-6 to select manual control
+            if (key >= '1' && key <= '6') {
+                const idx = parseInt(key) - 1;
+                if (idx < this.weapons.length) {
+                    this.manualWeaponIndex = (this.manualWeaponIndex === idx) ? -1 : idx;
+                    Messages.show(this.manualWeaponIndex >= 0 ? 
+                        `Manual: ${this.weapons[this.manualWeaponIndex].name} (F to fire, R to reload)` : 
+                        'Auto-attack mode');
+                } else {
+                    Messages.show('No weapon in that slot!');
+                }
+            }
+            
+            // Manual fire
+            if (key === 'f' && this.manualWeaponIndex >= 0) {
+                this.manualFire = true;
+            }
+            
+            // Manual reload
+            if (key === 'r' && this.manualWeaponIndex >= 0) {
+                const weapon = this.weapons[this.manualWeaponIndex];
+                if (weapon && weapon.usesAmmo && !weapon.isReloading && !weapon.isThrowable) {
+                    weapon.startReload();
+                }
             }
         });
         
@@ -133,11 +166,20 @@ const Player = {
             }
         });
         
-        Game.canvas.addEventListener('mousemove', (e) => {
-            const rect = Game.canvas.getBoundingClientRect();
-            this.mouseX = e.clientX - rect.left;
-            this.mouseY = e.clientY - rect.top;
-        });
+        // Mouse
+        if (Game.canvas) {
+            Game.canvas.addEventListener('mousemove', (e) => {
+                const rect = Game.canvas.getBoundingClientRect();
+                this.mouseX = e.clientX - rect.left;
+                this.mouseY = e.clientY - rect.top;
+            });
+            
+            Game.canvas.addEventListener('click', (e) => {
+                if (this.manualWeaponIndex >= 0) {
+                    this.manualFire = true;
+                }
+            });
+        }
     },
     
     update(deltaTime) {
@@ -169,8 +211,17 @@ const Player = {
         // Clamp to arena
         Physics.clampToArena(this.entity);
         
-        // Update facing angle
-        this.facingAngle = this.lastFacingAngle || Math.atan2(this.mouseY - this.entity.y, this.mouseX - this.entity.x);
+        // Update facing angle (toward mouse or movement direction)
+        if (this.lastFacingAngle !== undefined && (moveX !== 0 || moveY !== 0)) {
+            this.facingAngle = this.lastFacingAngle;
+        } else {
+            this.facingAngle = Math.atan2(this.mouseY - this.entity.y, this.mouseX - this.entity.x);
+        }
+        
+        // Gold magnet - auto collect nearby gold (placeholder for future)
+        if (this.goldMagnet) {
+            // Would auto-collect gold pickups in range
+        }
         
         // Health regeneration
         const currentTime = Date.now();
@@ -183,6 +234,36 @@ const Player = {
             }
             this.heal(Math.max(1, regenAmount));
             this.lastRegen = currentTime;
+        }
+        
+        // Manual weapon fire
+        if (this.manualFire && this.manualWeaponIndex >= 0 && this.manualWeaponIndex < this.weapons.length) {
+            this.manualFire = false;
+            const weapon = this.weapons[this.manualWeaponIndex];
+            if (weapon && weapon.canAttack(currentTime)) {
+                // Find target in mouse direction
+                const targetAngle = Math.atan2(this.mouseY - this.entity.y, this.mouseX - this.entity.x);
+                const targetX = this.entity.x + Math.cos(targetAngle) * weapon.range;
+                const targetY = this.entity.y + Math.sin(targetAngle) * weapon.range;
+                
+                const attackResult = weapon.attack(this.entity.x, this.entity.y, targetX, targetY);
+                
+                if (attackResult) {
+                    if (Array.isArray(attackResult)) {
+                        for (let proj of attackResult) {
+                            proj.weaponRef = weapon;
+                            Projectiles.active.push(proj);
+                        }
+                    } else if (attackResult.type === 'ranged') {
+                        attackResult.weaponRef = weapon;
+                        Projectiles.active.push(attackResult);
+                    } else if (attackResult.type === 'melee') {
+                        attackResult.attackedMonsters = new Set();
+                        attackResult.weaponRef = weapon;
+                        this.meleeAttacks.push(attackResult);
+                    }
+                }
+            }
         }
     },
     
@@ -208,11 +289,15 @@ const Player = {
         this.health -= amount;
         
         // Thorns damage
-        if (this.thornsDamage > 0 && source) {
+        if (this.thornsDamage > 0 && source && source.health !== undefined) {
             const thornsDmg = Math.floor(amount * this.thornsDamage);
-            if (thornsDmg > 0 && source.health) {
+            if (thornsDmg > 0) {
                 source.health -= thornsDmg;
                 Effects.damageIndicator(source.x, source.y, thornsDmg, false);
+                if (source.health <= 0 && Monsters.active.includes(source)) {
+                    const idx = Monsters.active.indexOf(source);
+                    if (idx > -1) Monsters.handleDeath(source, idx);
+                }
             }
         }
         
@@ -225,6 +310,7 @@ const Player = {
                 this.health = Math.max(1, Math.floor(this.maxHealth * 0.5));
                 Messages.show('GUARDIAN ANGEL SAVED YOU! 50% health restored.');
                 Effects.guardianAngel(this.entity.x, this.entity.y);
+                HUD.updateStats();
                 return false;
             }
             Game.gameOver();
@@ -268,12 +354,84 @@ const Player = {
         if (index < 0 || index >= this.weapons.length) return null;
         const weapon = this.weapons[index];
         this.weapons.splice(index, 1);
+        if (this.manualWeaponIndex === index) {
+            this.manualWeaponIndex = -1;
+        } else if (this.manualWeaponIndex > index) {
+            this.manualWeaponIndex--;
+        }
         HUD.updateWeapons();
         return weapon;
     },
     
     getWeaponById(id) {
         return this.weapons.find(w => w.id === id);
+    },
+    
+    useConsumable(index) {
+        if (Game.state !== GAME_STATE.WAVE) {
+            Messages.show('Can only use consumables during waves!');
+            return;
+        }
+        
+        const consumable = this.consumables[index];
+        if (!consumable) return;
+        
+        switch (consumable.id) {
+            case 'health_potion':
+                this.heal(Math.floor(this.maxHealth * 0.25));
+                Messages.show(`Used Health Potion!`);
+                break;
+            case 'ammo_pack':
+                this.weapons.forEach(w => {
+                    if (w.usesAmmo && !w.isThrowable) {
+                        w.currentAmmo = w.magazineSize;
+                        w.isReloading = false;
+                    }
+                });
+                Messages.show('All weapons reloaded!');
+                break;
+            case 'rage_potion':
+                this.damageMultiplier *= 1.5;
+                Messages.show('RAGE! +50% damage for 10s');
+                setTimeout(() => {
+                    this.damageMultiplier /= 1.5;
+                    Messages.show('Rage ended');
+                }, 10000);
+                break;
+            case 'bomb':
+                if (this.entity) {
+                    Effects.explosion(this.entity.x, this.entity.y, 150, '#FF4500');
+                    for (let i = Monsters.active.length - 1; i >= 0; i--) {
+                        const monster = Monsters.active[i];
+                        if (Physics.distance(this.entity, monster) < 150 + monster.radius) {
+                            monster.health -= 100;
+                            Effects.damageIndicator(monster.x, monster.y, 100, true);
+                            if (monster.health <= 0) Monsters.handleDeath(monster, i);
+                        }
+                    }
+                    Messages.show('Boom!');
+                }
+                break;
+            case 'exp_scroll':
+                const upgradable = this.weapons.filter(w => w.tier < 5);
+                if (upgradable.length > 0) {
+                    const weapon = upgradable[Math.floor(Math.random() * upgradable.length)];
+                    const oldTier = weapon.tier;
+                    weapon.tier++;
+                    weapon.applyTierBonuses();
+                    Messages.show(`${weapon.name} upgraded to Tier ${weapon.tier}!`);
+                    HUD.updateWeapons();
+                }
+                break;
+        }
+        
+        if (consumable.count > 1) {
+            consumable.count--;
+        } else {
+            this.consumables.splice(index, 1);
+        }
+        
+        HUD.updateConsumables();
     },
     
     draw() {
@@ -307,13 +465,29 @@ const Player = {
         ctx.beginPath(); ctx.arc(8, -5, 4, 0, Math.PI * 2); ctx.fill();
         ctx.beginPath(); ctx.arc(8, 5, 4, 0, Math.PI * 2); ctx.fill();
         
-        // Pupils
+        // Pupils (look toward mouse)
         ctx.fillStyle = '#000';
         ctx.shadowBlur = 0;
-        ctx.beginPath(); ctx.arc(10, -5, 2, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(10, 5, 2, 0, Math.PI * 2); ctx.fill();
+        const mouseAngle = Math.atan2(this.mouseY - this.entity.y, this.mouseX - this.entity.x) - this.facingAngle;
+        const pupilOffsetX = Math.cos(mouseAngle) * 1.5;
+        const pupilOffsetY = Math.sin(mouseAngle) * 1.5;
+        ctx.beginPath(); ctx.arc(8 + pupilOffsetX, -5 + pupilOffsetY, 2, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(8 + pupilOffsetX, 5 + pupilOffsetY, 2, 0, Math.PI * 2); ctx.fill();
         
-        // Weapon indicator
+        // Mouth
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(12, -1);
+        ctx.lineTo(18, 0);
+        ctx.moveTo(12, 1);
+        ctx.lineTo(18, 0);
+        ctx.stroke();
+        ctx.restore();
+        
+        // Weapon indicator (points toward mouse)
+        ctx.save();
+        ctx.rotate(this.facingAngle);
         ctx.strokeStyle = '#fc0';
         ctx.lineWidth = 3;
         ctx.shadowColor = '#fc0';
@@ -329,7 +503,7 @@ const Player = {
         ctx.fill();
         ctx.restore();
         
-        // Status effects
+        // Status effect indicators
         if (this.firstHitReduction && this.firstHitActive) {
             ctx.strokeStyle = '#0FF';
             ctx.lineWidth = 3;
@@ -362,6 +536,20 @@ const Player = {
             ctx.beginPath();
             ctx.arc(0, 0, this.entity.radius + 8 + Math.sin(Date.now() * 0.01) * 3, 0, Math.PI * 2);
             ctx.stroke();
+            if (this.slowFieldTicks > 0) {
+                ctx.fillStyle = 'rgba(255,100,100,0.9)';
+                ctx.font = 'bold 14px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(`-${this.slowFieldTicks} SPD`, 0, -this.entity.radius - 20);
+            }
+        }
+        
+        // Manual weapon indicator
+        if (this.manualWeaponIndex >= 0) {
+            ctx.fillStyle = '#FFD700';
+            ctx.font = 'bold 10px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('MANUAL', 0, this.entity.radius + 20);
         }
         
         ctx.restore();
