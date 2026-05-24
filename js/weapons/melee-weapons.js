@@ -3,7 +3,6 @@
 // ============================================
 
 const MeleeWeapons = {
-    // Create a melee attack
     createAttack(weapon, playerX, playerY, angle, currentTime) {
         if (weapon.dualStrike) {
             return {
@@ -29,6 +28,33 @@ const MeleeWeapons = {
                 weaponRef: weapon,
                 attackedMonsters: new Set()
             };
+        }
+        
+        // Spear/Trident throw mechanic
+        if (weapon.id === 'spear' && !weapon.isThrown) {
+            weapon.isThrown = true;
+            const projectile = {
+                type: 'ranged',
+                x: playerX, y: playerY,
+                startX: playerX, startY: playerY,
+                angle: angle,
+                speed: 12,
+                range: weapon.range * 1.5,
+                damage: weapon.baseDamage * 1.5,
+                color: '#CD7F32',
+                weaponId: weapon.id,
+                animation: 'trident',
+                isThrownTrident: true,
+                pierceCount: weapon.pierceCount,
+                piercedEnemies: [],
+                distanceTraveled: 0,
+                startTime: currentTime,
+                size: 8,
+                weaponRef: weapon,
+                lightningStrike: weapon.lightningStrike
+            };
+            Projectiles.active.push(projectile);
+            return null;
         }
         
         return {
@@ -64,7 +90,6 @@ const MeleeWeapons = {
         };
     },
     
-    // Draw melee attack animations
     drawAttack(attack) {
         const ctx = Game.ctx;
         const currentTime = Date.now();
@@ -89,7 +114,6 @@ const MeleeWeapons = {
         ctx.restore();
     },
     
-    // Sword - arc swing
     drawSword(ctx, attack, distance, progress, alpha) {
         const swingProgress = Math.sin(progress * Math.PI);
         const currentAngle = attack.angle - 0.5 + swingProgress * 1;
@@ -97,7 +121,6 @@ const MeleeWeapons = {
         ctx.shadowColor = 'rgba(255,255,255,0.5)';
         ctx.shadowBlur = 10 * alpha;
         
-        // Blade
         ctx.save();
         ctx.translate(10, 0);
         const gradient = ctx.createLinearGradient(0, -5, attack.radius * 0.9, -5);
@@ -115,25 +138,21 @@ const MeleeWeapons = {
         ctx.fill();
         ctx.restore();
         
-        // Hilt
         ctx.fillStyle = '#8B4513';
         ctx.fillRect(-5, -4, 15, 8);
         ctx.fillStyle = '#B87333';
         ctx.fillRect(-8, -8, 8, 16);
     },
     
-    // Battle Axe - 360° spin
     drawBattleAxe(ctx, attack, distance, progress, alpha) {
         const spinAngle = progress * Math.PI * 4;
         ctx.rotate(spinAngle);
         ctx.shadowColor = 'rgba(139,69,19,0.5)';
         ctx.shadowBlur = 15 * alpha;
         
-        // Handle
         ctx.fillStyle = attack.handleColor || '#654321';
         ctx.fillRect(-3, -attack.radius * 0.8, 6, attack.radius * 1.6);
         
-        // Blade
         ctx.save();
         ctx.translate(0, -attack.radius * 0.4);
         ctx.rotate(-0.3);
@@ -151,7 +170,6 @@ const MeleeWeapons = {
         ctx.fill();
         ctx.restore();
         
-        // Shockwave ring
         if (progress > 0.3 && progress < 0.7) {
             ctx.save();
             ctx.rotate(0);
@@ -165,7 +183,6 @@ const MeleeWeapons = {
         }
     },
     
-    // Dagger - stab
     drawDagger(ctx, attack, angle, distance, progress, alpha) {
         const stabProgress = Math.min(progress * 2, 1);
         const stabDistance = distance * 1.5;
@@ -187,7 +204,6 @@ const MeleeWeapons = {
         ctx.fillRect(-8, -4, 12, 8);
     },
     
-    // War Hammer - overhead smash
     drawHammer(ctx, attack, angle, distance, progress, alpha) {
         ctx.rotate(angle);
         const lift = Math.sin(progress * Math.PI) * 30;
@@ -209,7 +225,6 @@ const MeleeWeapons = {
         ctx.restore();
     },
     
-    // Trident - thrust
     drawTrident(ctx, attack, angle, distance, progress, alpha) {
         const thrustProgress = Math.min(progress * 1.5, 1);
         const thrustDistance = distance * 1.3 * thrustProgress;
@@ -231,9 +246,7 @@ const MeleeWeapons = {
         ctx.restore();
     },
     
-    // Dual Daggers
     drawDualDaggers(ctx, attack, angle, distance, progress, alpha) {
-        // First dagger
         ctx.save();
         ctx.rotate(angle - 0.2);
         ctx.translate(distance * 0.8, 0);
@@ -248,7 +261,6 @@ const MeleeWeapons = {
         ctx.fillRect(-5, -4, 8, 8);
         ctx.restore();
         
-        // Second dagger
         ctx.save();
         ctx.rotate(angle + 0.2);
         ctx.translate(distance * 0.8, 0);
@@ -264,7 +276,6 @@ const MeleeWeapons = {
         ctx.restore();
     },
     
-    // Default melee
     drawDefault(ctx, attack, distance, progress, alpha) {
         ctx.rotate(attack.angle);
         ctx.translate(distance, 0);
