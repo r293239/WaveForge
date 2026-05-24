@@ -3,13 +3,12 @@
 // ============================================
 
 const Shop = {
-    items: [], // Current 4 shop items
+    items: [],
     
     init() {
         this.items = [];
     },
     
-    // Generate 4 random shop items
     generateItems() {
         this.items = [];
         
@@ -23,7 +22,15 @@ const Shop = {
             if (availWeapons.length) {
                 const idx = Math.floor(Math.random() * availWeapons.length);
                 const weaponData = availWeapons[idx];
-                const tier = Math.random() < 0.3 ? 2 : 1;
+                
+                // Tier restrictions
+                let tier = 1;
+                if (Game.wave >= 20 && Math.random() < 0.15) {
+                    tier = 3;
+                } else if (Game.wave >= 10 && Math.random() < 0.3) {
+                    tier = 2;
+                }
+                
                 this.items.push({
                     type: 'weapon',
                     data: weaponData,
@@ -37,6 +44,8 @@ const Shop = {
         // Add 2 items
         let availItems = [...ITEM_DATA].filter(it => {
             if (it.id === 'landmine' && Towers.landmines.count >= Towers.landmines.max) return false;
+            if (it.id === 'healing_tower' && Towers.healingTowers.count >= Towers.healingTowers.max) return false;
+            if (it.id === 'turret' && Towers.turrets.count >= Towers.turrets.max) return false;
             if (it.id === 'runic_plate' && Game.purchasedItems.runicPlate) return false;
             if (it.id === 'guardian_angel' && Game.purchasedItems.guardianAngel) return false;
             if (it.id === 'vampire_teeth' && (Game.purchasedItems.vampireTeeth || 0) >= CONFIG.PURCHASE_LIMITS.vampireTeeth) return false;
@@ -47,20 +56,15 @@ const Shop = {
         for (let i = 0; i < 2; i++) {
             if (availItems.length) {
                 const idx = Math.floor(Math.random() * availItems.length);
-                this.items.push({
-                    type: 'item',
-                    data: availItems[idx]
-                });
+                this.items.push({ type: 'item', data: availItems[idx] });
                 availItems.splice(idx, 1);
             }
         }
         
-        // Shuffle
         this.items.sort(() => Math.random() - 0.5);
         HUD.updateShop();
     },
     
-    // Refresh shop
     refresh() {
         if (Game.gold < Game.refreshCost) {
             Messages.show(`Not enough gold! Need ${Game.refreshCost}g`);
@@ -76,7 +80,6 @@ const Shop = {
         HUD.updateStats();
     },
     
-    // Purchase an item
     purchase(index) {
         if (index < 0 || index >= this.items.length || !this.items[index]) return;
         
@@ -93,15 +96,41 @@ const Shop = {
             return;
         }
         
-        Game.gold -= cost;
-        
         if (shopItem.type === 'weapon') {
-            if (!Player.addWeapon(data, shopItem.tier || 1)) {
-                Game.gold += cost;
+            // Check if this weapon can be auto-merged with an existing one
+            const existingWeapon = Player.weapons.find(w => 
+                w.id === data.id && w.tier === (shopItem.tier || 1) && w.tier < 5
+            );
+            
+            if (existingWeapon) {
+                // Auto-merge regardless of slot availability
+                const mergeCost = existingWeapon.getMergeCost(shopItem.instance);
+                const totalCost = cost + mergeCost;
+                if (Game.gold < totalCost) {
+                    Messages.show(`Not enough gold! Need ${totalCost}g (includes merge cost)`);
+                    return;
+                }
+                Game.gold -= totalCost;
+                const merged = existingWeapon.merge(shopItem.instance);
+                const idx = Player.weapons.indexOf(existingWeapon);
+                Player.weapons[idx] = merged;
+                Messages.show(`Auto-merged to ${merged.getDisplayName()}!`);
+                this.items[index] = null;
+                HUD.updateAll();
                 return;
             }
+            
+            // Normal purchase - check slot availability
+            if (Player.weapons.length >= CONFIG.MAX_WEAPON_SLOTS) {
+                Messages.show('No empty weapon slots!');
+                return;
+            }
+            
+            Game.gold -= cost;
+            Player.addWeapon(data, shopItem.tier || 1);
             Messages.show(`Purchased ${data.name} Tier ${shopItem.tier || 1}!`);
         } else {
+            Game.gold -= cost;
             this.applyItemEffect(data);
             Messages.show(`Purchased ${data.name}!`);
         }
@@ -110,7 +139,6 @@ const Shop = {
         HUD.updateAll();
     },
     
-    // Apply item effect
     applyItemEffect(item) {
         switch (item.id) {
             case 'damage_orb':
@@ -182,9 +210,7 @@ const Shop = {
                     Player.bloodContractInterval = setInterval(() => {
                         if (Game.state === GAME_STATE.WAVE) {
                             const dmg = Math.max(1, Math.floor(Player.maxHealth * 0.01 * Player.bloodContractStacks));
-                            if (Player.health > dmg) {
-                                Player.takeDamage(dmg);
-                            }
+                            if (Player.health > dmg) Player.takeDamage(dmg);
                         }
                     }, 1000);
                 } else {
@@ -194,19 +220,33 @@ const Shop = {
                 Game.purchasedItems.bloodContract = (Game.purchasedItems.bloodContract || 0) + 1;
                 break;
             case 'landmine':
-                Towers.landmines.count++;
-                if (Game.state === GAME_STATE.WAVE) {
-                    setTimeout(() => Towers.spawnLandmine(), 100);
+                if (!Towers.purchaseTower('landmine')) {
+                    Messages.show(`Maximum landmines (${Towers.landmines.max}) reached!`);
+                    Game.gold += item.cost;
+                    return;
                 }
+                Messages.show(`Landmine purchased! (${Towers.landmines.count}/${Towers.landmines.max})`);
                 break;
             case 'healing_tower':
-                Towers.placeHealingTower();
+                if (!Towers.purchaseTower('healing_tower')) {
+                    Messages.show(`Maximum healing towers (${Towers.healingTowers.max}) reached!`);
+                    Game.gold += item.cost;
+                    return;
+                }
+                Messages.show(`Healing Tower purchased! (${Towers.healingTowers.count}/${Towers.healingTowers.max})`);
                 break;
-            // Consumables are handled by Player.useConsumable
+            case 'turret':
+                if (!Towers.purchaseTower('turret')) {
+                    Messages.show(`Maximum turrets (${Towers.turrets.max}) reached!`);
+                    Game.gold += item.cost;
+                    return;
+                }
+                Messages.show(`Turret purchased! (${Towers.turrets.count}/${Towers.turrets.max})`);
+                break;
+            // Consumables handled by Player
         }
     },
     
-    // Get cost of a shop item
     getCost(shopItem) {
         if (shopItem.type === 'weapon') {
             return shopItem.instance.getShopCost();
