@@ -56,8 +56,18 @@ const Save = {
             },
             
             towers: {
-                landmines: { count: Towers.landmines.count },
-                healingTowers: Towers.healingTowers.map(t => ({ x: t.x, y: t.y, health: t.health }))
+                landmines: {
+                    count: Towers.landmines.count,
+                    active: Towers.landmines.active.map(m => ({ x: m.x, y: m.y }))
+                },
+                healingTowers: {
+                    count: Towers.healingTowers.count,
+                    active: Towers.healingTowers.active.map(t => ({ x: t.x, y: t.y, health: t.health }))
+                },
+                turrets: {
+                    count: Towers.turrets.count,
+                    active: Towers.turrets.active.map(t => ({ x: t.x, y: t.y, health: t.health }))
+                }
             },
             
             weapons: Player.weapons.map(w => ({
@@ -75,7 +85,11 @@ const Save = {
             timestamp: Date.now()
         };
         
-        localStorage.setItem(this.key, JSON.stringify(data));
+        try {
+            localStorage.setItem(this.key, JSON.stringify(data));
+        } catch(e) {
+            console.log('Save failed:', e.message);
+        }
     },
     
     loadGame() {
@@ -104,7 +118,29 @@ const Save = {
             
             // Restore player
             if (data.player) {
-                Object.assign(Player, data.player);
+                Player.health = data.player.health;
+                Player.maxHealth = data.player.maxHealth;
+                Player.damageMultiplier = data.player.damageMultiplier;
+                Player.speed = data.player.speed;
+                Player.baseSpeed = data.player.baseSpeed;
+                Player.speedMultiplier = data.player.speedMultiplier;
+                Player.lifeSteal = data.player.lifeSteal;
+                Player.criticalChance = data.player.criticalChance;
+                Player.goldMultiplier = data.player.goldMultiplier;
+                Player.healthRegenPercent = data.player.healthRegenPercent;
+                Player.damageReduction = data.player.damageReduction;
+                Player.dodgeChance = data.player.dodgeChance;
+                Player.thornsDamage = data.player.thornsDamage;
+                Player.attackSpeedMultiplier = data.player.attackSpeedMultiplier;
+                Player.reloadSpeedMultiplier = data.player.reloadSpeedMultiplier;
+                Player.firstHitReduction = data.player.firstHitReduction;
+                Player.guardianAngel = data.player.guardianAngel;
+                Player.guardianAngelUsed = data.player.guardianAngelUsed;
+                Player.bloodContract = data.player.bloodContract;
+                Player.bloodContractStacks = data.player.bloodContractStacks;
+                Player.berserkerRing = data.player.berserkerRing;
+                Player.consumables = data.player.consumables || [];
+                
                 if (data.player.x && data.player.y) {
                     Player.entity = {
                         x: data.player.x,
@@ -119,10 +155,23 @@ const Save = {
             
             // Restore towers
             if (data.towers) {
-                Towers.landmines.count = data.towers.landmines.count || 0;
+                if (data.towers.landmines) {
+                    Towers.landmines.count = data.towers.landmines.count || 0;
+                    Towers.landmines.active = (data.towers.landmines.active || []).map(m => ({
+                        ...m, radius: 15, damage: 80, explosionRadius: 60, active: true, startTime: Date.now(), color: '#8B4513'
+                    }));
+                }
                 if (data.towers.healingTowers) {
-                    Towers.healingTowers = data.towers.healingTowers.map(t => ({
+                    Towers.healingTowers.count = data.towers.healingTowers.count || 0;
+                    Towers.healingTowers.active = (data.towers.healingTowers.active || []).map(t => ({
                         ...t, radius: 20, healAmount: 1, lastHeal: Date.now()
+                    }));
+                }
+                if (data.towers.turrets) {
+                    Towers.turrets.count = data.towers.turrets.count || 0;
+                    Towers.turrets.active = (data.towers.turrets.active || []).map(t => ({
+                        ...t, radius: 20, damage: 7, range: 300, attackSpeed: 1.0,
+                        projectileColor: '#FFD700', projectileSpeed: 10, lastAttack: 0
                     }));
                 }
             }
