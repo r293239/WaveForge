@@ -31,7 +31,6 @@ const Game = {
         this.purchasedItems = {};
         this.weaponUpgrades = {};
         
-        // Initialize all systems in dependency order
         Physics.init();
         Arena.init();
         Player.init();
@@ -45,6 +44,7 @@ const Game = {
         Shop.init();
         Waves.init();
         Upgrades.init();
+        Abilities.init();
         Messages.init();
         HUD.init();
         StatsPanel.init();
@@ -52,13 +52,8 @@ const Game = {
         Joystick.init();
         Save.init();
         
-        // Setup keyboard shortcuts
         this.setupKeyboard();
-        
-        // Show start screen
         Overlays.showStart();
-        
-        // Start game loop
         this.gameLoop();
         console.log('Game loop started');
     },
@@ -66,28 +61,12 @@ const Game = {
     setupKeyboard() {
         document.addEventListener('keydown', (e) => {
             const key = e.key.toLowerCase();
-            
             if (key === ' ' && (this.state === GAME_STATE.SHOP || this.state === GAME_STATE.WIN)) {
                 e.preventDefault();
                 this.startNextWave();
             }
-            
-            if (key === 'r' && this.state === GAME_STATE.SHOP) {
-                e.preventDefault();
-                Player.weapons.forEach(w => {
-                    if (w.usesAmmo && !w.isReloading && !w.isThrowable) w.startReload();
-                });
-            }
-            
-            if (key === 's' && e.ctrlKey) {
-                e.preventDefault();
-                Save.saveGame();
-            }
-            
-            if (key === 'l' && e.ctrlKey) {
-                e.preventDefault();
-                Save.loadGame();
-            }
+            if (key === 's' && e.ctrlKey) { e.preventDefault(); Save.saveGame(); }
+            if (key === 'l' && e.ctrlKey) { e.preventDefault(); Save.loadGame(); }
         });
     },
     
@@ -108,7 +87,6 @@ const Game = {
             Towers.update(currentTime);
             Monsters.updateStatusEffects(currentTime);
             Waves.checkWaveEnd();
-            
             Physics.resolveMonsterCollisions();
             Physics.resolvePlayerMonsterCollisions();
         }
@@ -157,6 +135,7 @@ const Game = {
         Projectiles.reset();
         Towers.reset();
         Effects.reset();
+        Abilities.reset();
         
         const handgun = WEAPON_DATA.find(w => w.id === 'handgun');
         Player.addWeapon(handgun);
@@ -190,7 +169,7 @@ const Game = {
         }
         
         if (this.sandboxMode && this.wave === 40) {
-            Messages.show('🏖️ Sandbox Mode Active! Endless waves begin!', 4000);
+            Messages.show('Sandbox Mode Active! Endless waves begin!', 4000);
         }
         
         this.state = GAME_STATE.STAT_SELECT;
@@ -200,10 +179,7 @@ const Game = {
         this.gold += Math.floor(waveConfig.goldReward * (1 + Player.goldMultiplier));
         
         Player.weapons.forEach(w => {
-            if (w.usesAmmo && !w.isThrowable) {
-                w.currentAmmo = w.magazineSize;
-                w.isReloading = false;
-            }
+            if (w.usesAmmo && !w.isThrowable) { w.currentAmmo = w.magazineSize; w.isReloading = false; }
         });
         
         Upgrades.showSelection();
@@ -214,10 +190,7 @@ const Game = {
         this.state = GAME_STATE.GAMEOVER;
         this.waveActive = false;
         
-        if (this.autoSaveInterval) {
-            clearInterval(this.autoSaveInterval);
-            this.autoSaveInterval = null;
-        }
+        if (this.autoSaveInterval) { clearInterval(this.autoSaveInterval); this.autoSaveInterval = null; }
         
         Player.inSlowField = false;
         Player.slowFieldTicks = 0;
@@ -245,7 +218,6 @@ const Game = {
     }
 };
 
-// Initialize when DOM is ready
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
     setTimeout(() => Game.init(), 100);
 } else {
