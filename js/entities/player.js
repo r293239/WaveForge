@@ -121,11 +121,6 @@ const Player = {
                 case 'a': case 'arrowleft': this.keys.a = true; this.keys.left = true; e.preventDefault(); break;
                 case 'd': case 'arrowright': this.keys.d = true; this.keys.right = true; e.preventDefault(); break;
             }
-            if (key === 'r') {
-                this.weapons.forEach(w => {
-                    if (w.usesAmmo && !w.isReloading && !w.isThrowable) w.startReload();
-                });
-            }
         });
         
         document.addEventListener('keyup', (e) => {
@@ -172,11 +167,7 @@ const Player = {
         
         Physics.clampToArena(this.entity);
         
-        if (this.lastFacingAngle !== undefined && (moveX !== 0 || moveY !== 0)) {
-            this.facingAngle = this.lastFacingAngle;
-        } else {
-            this.facingAngle = Math.atan2(this.mouseY - this.entity.y, this.mouseX - this.entity.x);
-        }
+        this.facingAngle = this.lastFacingAngle || Math.atan2(this.mouseY - this.entity.y, this.mouseX - this.entity.x);
         
         const currentTime = Date.now();
         if ((this.healthRegen > 0 || this.healthRegenPercent > 0) && 
