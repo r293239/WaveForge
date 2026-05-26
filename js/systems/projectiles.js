@@ -31,12 +31,119 @@ const Projectiles = {
     updatePlayerProjectiles(currentTime) {
         for (let i = this.active.length - 1; i >= 0; i--) {
             const proj = this.active[i];
-            proj.x += Math.cos(proj.angle) * proj.speed; proj.y += Math.sin(proj.angle) * proj.speed;
+            proj.x += Math.cos(proj.angle) * proj.speed;
+            proj.y += Math.sin(proj.angle) * proj.speed;
             proj.distanceTraveled = (proj.distanceTraveled || 0) + proj.speed;
+            
             if (proj.isBoomerang) { this.updateBoomerang(proj, i); continue; }
             if (proj.isThrownTrident) { this.updateThrownTrident(proj, i); continue; }
-            if (proj.distanceTraveled > proj.range || !Arena.isInBounds(proj.x, proj.y)) { this.active.splice(i, 1); continue; }
-            for (let j = Monsters.active.length - 1; j >= 0; j--) { const m = Monsters.active[j]; if (Physics.distance(proj, m) < m.radius + (proj.size || 4)) { this.applyProjectileDamage(proj, m, j, i); break; } }
+            
+            if (proj.distanceTraveled > proj.range || !Arena.isInBounds(proj.x, proj.y)) {
+                this.active.splice(i, 1);
+                continue;
+            }
+            
+            for (let j = Monsters.active.length - 1; j >= 0; j--) {
+                const m = Monsters.active[j];
+                if (Physics.distance(proj, m) < m.radius + (proj.size || 4)) {
+                    this.applyProjectileDamage(proj, m, j, i);
+                    break;
+                }
+            }
+        }
+    },
+    
+    updateBoomerang(proj, index) {
+        if (!Player.entity) { this.active.splice(index, 1); return; }
+        
+        if (proj.state === 'thrown') {
+            // Curve the flight path
+            proj.angle += proj.curveRate;
+            
+            // Move already done in updatePlayerProjectiles (incremented x,y,distanceTraveled)
+            
+            // Check hits
+            for (let j = Monsters.active.length - 1; j >= 0; j--) {
+                const m = Monsters.active[j];
+                if (proj.targetsHit.includes(m)) continue;
+                if (Physics.distance(proj, m) < m.radius + (proj.size || 4)) {
+                    this.applyProjectileDamage(proj, m, j, index);
+                    proj.targetsHit.push(m);
+                    
+                    // Transition to returning if max targets reached
+                    if (proj.targetsHit.length >= (proj.maxTargets || 4)) {
+                        proj.state = 'returning';
+                        proj.orbiting = false;
+                        proj.speed = 12;
+                        proj.angle = Math.atan2(Player.entity.y - proj.y, Player.entity.x - proj.x);
+                        return;
+                    }
+                    break;
+                }
+            }
+            
+            // Return if out of range
+            if (proj.distanceTraveled > proj.range) {
+                proj.state = 'returning';
+                proj.speed = 12;
+                proj.angle = Math.atan2(Player.entity.y - proj.y, Player.entity.x - proj.x);
+                return;
+            }
+            return;
+        }
+        
+        if (proj.state === 'returning') {
+            const dx = Player.entity.x - proj.x,
+                  dy = Player.entity.y - proj.y,
+                  dist = Math.hypot(dx, dy);
+            if (dist < 30) {
+                // Returned to player – reset to orbiting (just for visual, or disappear)
+                proj.state = 'orbiting';
+                proj.orbiting = true;
+                proj.orbitAngle = Math.atan2(dy, dx);
+                proj.speed = 0;
+                proj.targetsHit = [];
+                return;
+            }
+            proj.angle = Math.atan2(dy, dx);
+            proj.speed = 12;
+            proj.x += Math.cos(proj.angle) * proj.speed;
+            proj.y += Math.sin(proj.angle) * proj.speed;
+            // Optionally deal damage while returning
+            for (let j = Monsters.active.length - 1; j >= 0; j--) {
+                const m = Monsters.active[j];
+                if (proj.targetsHit.includes(m)) continue;
+                if (Physics.distance(proj, m) < m.radius + (proj.size || 4)) {
+                    this.applyProjectileDamage(proj, m, j, index);
+                    proj.targetsHit.push(m);
+                    break;
+                }
+            }
+            return;
+        }
+        
+        // Fallback for old 'orbiting' state (should not happen with new creation)
+        if (proj.state === 'orbiting') {
+            proj.orbitAngle += proj.orbitSpeed;
+            proj.x = Player.entity.x + Math.cos(proj.orbitAngle) * proj.orbitRadius;
+            proj.y = Player.entity.y + Math.sin(proj.orbitAngle) * proj.orbitRadius;
+            // Hit detection ...
+            for (let j = Monsters.active.length - 1; j >= 0; j--) {
+                const m = Monsters.active[j];
+                if (proj.targetsHit.includes(m)) continue;
+                if (Physics.distance(proj, m) < m.radius + (proj.size || 4)) {
+                    this.applyProjectileDamage(proj, m, j, index);
+                    proj.targetsHit.push(m);
+                    if (proj.targetsHit.length >= (proj.maxTargets || 4)) {
+                        proj.state = 'returning';
+                        proj.orbiting = false;
+                        proj.speed = 15;
+                        proj.angle = Math.atan2(Player.entity.y - proj.y, Player.entity.x - proj.x);
+                        return;
+                    }
+                    break;
+                }
+            }
         }
     },
     
@@ -48,18 +155,6 @@ const Projectiles = {
     dropTrident(proj, index) { proj.speed = 0; if (proj.weaponRef) { proj.weaponRef.isThrown = true; proj.weaponRef.thrownX = proj.x; proj.weaponRef.thrownY = proj.y; } this.active.splice(index, 1); },
     
     applyLightningStrike(monster) { const targets = [monster]; for (let i = 0; i < 3; i++) { const last = targets[targets.length-1]; let nearest = null, nd = 100; for (let o of Monsters.active) { if (targets.includes(o)) continue; const d = Physics.distance(last, o); if (d < nd) { nd = d; nearest = o; } } if (nearest) targets.push(nearest); else break; } for (let i = 0; i < targets.length; i++) { targets[i].health -= 25; Effects.damageIndicator(targets[i].x, targets[i].y, 25, true); if (i > 0) Effects.lightningBolt(targets[i-1].x, targets[i-1].y, targets[i].x, targets[i].y); } },
-    
-    updateBoomerang(proj, index) {
-        if (!Player.entity) { this.active.splice(index, 1); return; }
-        if (proj.orbiting) {
-            proj.orbitAngle += proj.orbitSpeed;
-            proj.x = Player.entity.x + Math.cos(proj.orbitAngle) * proj.orbitRadius;
-            proj.y = Player.entity.y + Math.sin(proj.orbitAngle) * proj.orbitRadius;
-            for (let j = Monsters.active.length - 1; j >= 0; j--) { const m = Monsters.active[j]; if (proj.targetsHit.includes(m)) continue; if (Physics.distance(proj, m) < m.radius + (proj.size || 4)) { this.applyProjectileDamage(proj, m, j, index); proj.targetsHit.push(m); if (proj.targetsHit.length >= (proj.maxTargets || 4)) { proj.state = 'returning'; proj.orbiting = false; proj.speed = 15; proj.angle = Math.atan2(Player.entity.y - proj.y, Player.entity.x - proj.x); return; } break; } }
-            return;
-        }
-        if (proj.state === 'returning') { const dx = Player.entity.x - proj.x, dy = Player.entity.y - proj.y, dist = Math.hypot(dx, dy); if (dist < 30) { proj.state = 'orbiting'; proj.orbiting = true; proj.orbitAngle = Math.atan2(dy, dx); proj.speed = 0; proj.targetsHit = []; return; } proj.angle = Math.atan2(dy, dx); proj.speed = 15; proj.x += Math.cos(proj.angle) * proj.speed; proj.y += Math.sin(proj.angle) * proj.speed; }
-    },
     
     applyProjectileDamage(proj, monster, mi, pi) {
         let dmg = proj.damage * Player.damageMultiplier * Game.difficultyMultipliers.playerDamage;
@@ -85,9 +180,58 @@ const Projectiles = {
     
     drawBullet(ctx, proj) { ctx.shadowColor = proj.color; ctx.shadowBlur = 10; ctx.fillStyle = proj.color; ctx.beginPath(); ctx.arc(proj.x, proj.y, proj.size || 3, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0; ctx.strokeStyle = proj.color; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(proj.x - Math.cos(proj.angle) * 8, proj.y - Math.sin(proj.angle) * 8); ctx.lineTo(proj.x, proj.y); ctx.stroke(); },
     drawCrossbowBolt(ctx, proj) { ctx.save(); ctx.translate(proj.x, proj.y); ctx.rotate(proj.angle); ctx.fillStyle = '#8B4513'; ctx.fillRect(-15, -1, 30, 2); ctx.fillStyle = '#C0C0C0'; ctx.beginPath(); ctx.moveTo(15, -4); ctx.lineTo(25, 0); ctx.lineTo(15, 4); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#F00'; ctx.beginPath(); ctx.moveTo(-15, -3); ctx.lineTo(-25, -6); ctx.lineTo(-15, -1); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(-15, 3); ctx.lineTo(-25, 6); ctx.lineTo(-15, 1); ctx.closePath(); ctx.fill(); ctx.restore(); },
-    drawThrownTridentProjectile(ctx, proj) { ctx.save(); ctx.translate(proj.x, proj.y); ctx.rotate(proj.angle + Math.PI / 2); ctx.shadowColor = '#CD7F32'; ctx.shadowBlur = 10; ctx.fillStyle = '#8B4513'; ctx.fillRect(-15, -2, 30, 4); ctx.strokeStyle = '#FFD700'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(15, 0); ctx.lineTo(8, -6); ctx.moveTo(15, 0); ctx.lineTo(8, 6); ctx.moveTo(15, 0); ctx.lineTo(5, 0); ctx.lineTo(-2, -3); ctx.moveTo(15, 0); ctx.lineTo(5, 0); ctx.lineTo(-2, 3); ctx.stroke(); ctx.restore(); },
+    drawThrownTridentProjectile(ctx, proj) {
+        // *** FIX: Tip points in movement direction, not perpendicular ***
+        ctx.save();
+        ctx.translate(proj.x, proj.y);
+        ctx.rotate(proj.angle);   // removed + Math.PI/2
+        ctx.shadowColor = '#CD7F32';
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = '#8B4513';
+        ctx.fillRect(-15, -2, 30, 4);   // shaft from -15 to +15
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 2;
+        // Prongs at the tip (right end)
+        ctx.beginPath();
+        ctx.moveTo(15, 0); ctx.lineTo(8, -6);
+        ctx.moveTo(15, 0); ctx.lineTo(8, 6);
+        ctx.moveTo(15, 0); ctx.lineTo(5, 0); ctx.lineTo(-2, -3);
+        ctx.moveTo(15, 0); ctx.lineTo(5, 0); ctx.lineTo(-2, 3);
+        ctx.stroke();
+        ctx.restore();
+    },
     drawDroppedTrident(weapon) { const ctx = Game.ctx; if (!Player.entity) return; const dist = Physics.distance(Player.entity, { x: weapon.thrownX, y: weapon.thrownY }); ctx.save(); ctx.translate(weapon.thrownX, weapon.thrownY); ctx.rotate(-0.3 + Math.sin(Date.now() * 0.002) * 0.1); ctx.shadowColor = dist < weapon.pickupRange ? '#FFD700' : '#CD7F32'; ctx.shadowBlur = dist < weapon.pickupRange ? 15 : 5; ctx.fillStyle = '#8B4513'; ctx.fillRect(-2, -25, 4, 35); ctx.strokeStyle = '#FFD700'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, -25); ctx.lineTo(-8, -35); ctx.moveTo(0, -25); ctx.lineTo(8, -35); ctx.moveTo(0, -25); ctx.lineTo(0, -38); ctx.stroke(); ctx.restore(); if (dist < weapon.pickupRange) { weapon.isThrown = false; weapon.thrownX = 0; weapon.thrownY = 0; Messages.show('Trident retrieved!', 1000); } },
-    drawBoomerang(ctx, proj) { proj.rotation = (proj.rotation || 0) + (proj.orbiting ? 0.15 : 0.1); if (boomerangProjImage.complete && boomerangProjImage.naturalWidth > 0) { ctx.save(); ctx.translate(proj.x, proj.y); ctx.rotate(proj.rotation); ctx.shadowColor = '#8B4513'; ctx.shadowBlur = 10; ctx.drawImage(boomerangProjImage, -20, -20, 40, 40); ctx.restore(); } else { ctx.save(); ctx.translate(proj.x, proj.y); ctx.rotate(proj.rotation); ctx.shadowColor = '#8B4513'; ctx.shadowBlur = 10; ctx.fillStyle = '#8B4513'; ctx.strokeStyle = '#654321'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, -5); ctx.lineTo(20, -10); ctx.lineTo(25, 0); ctx.lineTo(20, 10); ctx.lineTo(0, 5); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore(); } },
+    drawBoomerang(ctx, proj) {
+        proj.rotation = (proj.rotation || 0) + (proj.state === 'thrown' ? 0.2 : 0.15); // faster spin when thrown
+        if (boomerangProjImage.complete && boomerangProjImage.naturalWidth > 0) {
+            ctx.save();
+            ctx.translate(proj.x, proj.y);
+            ctx.rotate(proj.rotation);
+            ctx.shadowColor = '#8B4513';
+            ctx.shadowBlur = 10;
+            ctx.drawImage(boomerangProjImage, -20, -20, 40, 40);
+            ctx.restore();
+        } else {
+            ctx.save();
+            ctx.translate(proj.x, proj.y);
+            ctx.rotate(proj.rotation);
+            ctx.shadowColor = '#8B4513';
+            ctx.shadowBlur = 10;
+            ctx.fillStyle = '#8B4513';
+            ctx.strokeStyle = '#654321';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, -5);
+            ctx.lineTo(20, -10);
+            ctx.lineTo(25, 0);
+            ctx.lineTo(20, 10);
+            ctx.lineTo(0, 5);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+        }
+    },
     drawKnife(ctx, proj) { proj.rotation = (proj.rotation || 0) + (proj.spinSpeed || 0.3); ctx.save(); ctx.translate(proj.x, proj.y); ctx.rotate(proj.rotation); ctx.fillStyle = '#C0C0C0'; ctx.strokeStyle = '#808080'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, -proj.size); ctx.lineTo(proj.size, 0); ctx.lineTo(0, proj.size); ctx.lineTo(-proj.size, 0); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore(); },
     drawLaser(ctx, proj) { const pulse = Math.sin(Date.now() * 0.02) * 2; ctx.shadowColor = '#0FF'; ctx.shadowBlur = 20; ctx.strokeStyle = '#0FF'; ctx.lineWidth = 4 + pulse; ctx.beginPath(); ctx.moveTo(proj.x - Math.cos(proj.angle) * 10, proj.y - Math.sin(proj.angle) * 10); ctx.lineTo(proj.x, proj.y); ctx.stroke(); ctx.fillStyle = 'rgba(0,255,255,0.3)'; ctx.beginPath(); ctx.arc(proj.x, proj.y, 6, 0, Math.PI * 2); ctx.fill(); },
     drawSniper(ctx, proj) { ctx.save(); ctx.translate(proj.x, proj.y); ctx.shadowColor = '#FF4500'; ctx.shadowBlur = 20; ctx.fillStyle = '#FFD700'; ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#FF4500'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-Math.cos(proj.angle) * 15, -Math.sin(proj.angle) * 15); ctx.lineTo(0, 0); ctx.stroke(); ctx.restore(); }
