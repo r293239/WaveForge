@@ -26,11 +26,53 @@ const RangedWeapons = {
     },
     
     createBoomerang(weapon, x, y, angle, time) {
+        // Only one boomerang can be in flight (unless doubleThrow)
         if (!weapon.doubleThrow) {
-            const existingBoomerang = Projectiles.active.find(p => p.weaponId === 'boomerang' && p.orbiting);
+            const existingBoomerang = Projectiles.active.find(p => p.weaponId === 'boomerang' && (p.orbiting || p.state !== 'orbiting'));
             if (existingBoomerang) return null;
         }
-        return { type: 'ranged', x, y, startX: x, startY: y, angle: 0, speed: 0, range: weapon.range, damage: weapon.baseDamage, color: weapon.projectileColor, weaponId: weapon.id, animation: 'boomerang', isBoomerang: true, state: 'orbiting', orbitAngle: 0, orbitRadius: 100, orbitSpeed: 0.06, distanceTraveled: 0, targetsHit: [], maxTargets: weapon.maxTargets, rotation: 0, startTime: time, hitThisFrame: false, size: 4, weaponRef: weapon, orbiting: true };
+        
+        // Determine throw direction: nearest monster, or player facing if none
+        let targetAngle = angle;
+        if (Monsters.active.length > 0 && Player.entity) {
+            let nearest = null;
+            let nearestDist = Infinity;
+            for (const m of Monsters.active) {
+                const d = Physics.distance(Player.entity, m);
+                if (d < nearestDist) {
+                    nearestDist = d;
+                    nearest = m;
+                }
+            }
+            if (nearest) {
+                targetAngle = Math.atan2(nearest.y - Player.entity.y, nearest.x - Player.entity.x);
+            }
+        }
+        
+        return {
+            type: 'ranged',
+            x, y,
+            startX: x, startY: y,
+            angle: targetAngle,
+            speed: 8,
+            range: weapon.range,
+            damage: weapon.baseDamage,
+            color: weapon.projectileColor,
+            weaponId: weapon.id,
+            animation: 'boomerang',
+            isBoomerang: true,
+            state: 'thrown',          // new state: thrown, returning, orbiting
+            curveRate: 0.04,         // how fast it curves (radians per frame)
+            distanceTraveled: 0,
+            targetsHit: [],
+            maxTargets: weapon.maxTargets || 4,
+            rotation: 0,
+            startTime: time,
+            size: 4,
+            weaponRef: weapon,
+            orbiting: false,         // no longer starts orbiting
+            doubleThrow: weapon.doubleThrow || false
+        };
     },
     
     createThrowingKnife(weapon, x, y, angle, time) {
