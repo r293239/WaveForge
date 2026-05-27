@@ -55,25 +55,32 @@ const Projectiles = {
     
     updateBoomerang(proj, index) {
         if (!Player.entity) { this.active.splice(index, 1); return; }
-        
+
         if (proj.state === 'thrown') {
-            // Curve the flight path
-            proj.angle += proj.curveRate;
-            
-            // Move already done in updatePlayerProjectiles (incremented x,y,distanceTraveled)
-            
-            // Check hits
+            // Advance along the circular arc
+            proj.currentArcAngle += proj.arcAngleStep * proj.arcDirection;
+            proj.x = proj.arcCenterX + Math.cos(proj.currentArcAngle) * proj.arcRadius;
+            proj.y = proj.arcCenterY + Math.sin(proj.currentArcAngle) * proj.arcRadius;
+            proj.distanceTraveled += proj.arcAngleStep * proj.arcRadius;  // approximate
+
+            // Check if we've passed the target angle
+            if (!proj.passedTarget) {
+                const diff = proj.currentArcAngle - proj.arcStartAngle;
+                const targetDiff = proj.arcTargetAngle - proj.arcStartAngle;
+                if (proj.arcDirection === 1 && diff >= targetDiff) proj.passedTarget = true;
+                else if (proj.arcDirection === -1 && diff <= targetDiff) proj.passedTarget = true;
+            }
+
+            // Hit detection
             for (let j = Monsters.active.length - 1; j >= 0; j--) {
                 const m = Monsters.active[j];
                 if (proj.targetsHit.includes(m)) continue;
                 if (Physics.distance(proj, m) < m.radius + (proj.size || 4)) {
                     this.applyProjectileDamage(proj, m, j, index);
                     proj.targetsHit.push(m);
-                    
-                    // Transition to returning if max targets reached
+                    // If max targets reached, transition to returning early
                     if (proj.targetsHit.length >= (proj.maxTargets || 4)) {
                         proj.state = 'returning';
-                        proj.orbiting = false;
                         proj.speed = 12;
                         proj.angle = Math.atan2(Player.entity.y - proj.y, Player.entity.x - proj.x);
                         return;
@@ -81,35 +88,43 @@ const Projectiles = {
                     break;
                 }
             }
-            
-            // Return if out of range
-            if (proj.distanceTraveled > proj.range) {
+
+            // Check if boomerang has completed the full circle and is back near the player
+            const dx = Player.entity.x - proj.x;
+            const dy = Player.entity.y - proj.y;
+            const distToPlayer = Math.hypot(dx, dy);
+            // Return to player if we've passed the target and are close enough
+            if (proj.passedTarget && distToPlayer < 40) {
+                proj.state = 'returning';
+                proj.speed = 12;
+                proj.angle = Math.atan2(dy, dx);
+                return;
+            }
+
+            // Safety: if it goes too far, force return
+            if (proj.distanceTraveled > proj.range * 2) {
                 proj.state = 'returning';
                 proj.speed = 12;
                 proj.angle = Math.atan2(Player.entity.y - proj.y, Player.entity.x - proj.x);
-                return;
             }
             return;
         }
-        
+
         if (proj.state === 'returning') {
-            const dx = Player.entity.x - proj.x,
-                  dy = Player.entity.y - proj.y,
-                  dist = Math.hypot(dx, dy);
-            if (dist < 30) {
-                // Returned to player – reset to orbiting (just for visual, or disappear)
-                proj.state = 'orbiting';
-                proj.orbiting = true;
-                proj.orbitAngle = Math.atan2(dy, dx);
-                proj.speed = 0;
-                proj.targetsHit = [];
+            const dx = Player.entity.x - proj.x;
+            const dy = Player.entity.y - proj.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist < 20) {
+                // Caught – remove projectile or reset for next throw
+                this.active.splice(index, 1);
                 return;
             }
             proj.angle = Math.atan2(dy, dx);
             proj.speed = 12;
             proj.x += Math.cos(proj.angle) * proj.speed;
             proj.y += Math.sin(proj.angle) * proj.speed;
-            // Optionally deal damage while returning
+
+            // Deal damage while returning
             for (let j = Monsters.active.length - 1; j >= 0; j--) {
                 const m = Monsters.active[j];
                 if (proj.targetsHit.includes(m)) continue;
@@ -121,13 +136,12 @@ const Projectiles = {
             }
             return;
         }
-        
-        // Fallback for old 'orbiting' state (should not happen with new creation)
+
+        // Fallback for old orbiting state (should not be used with new creation)
         if (proj.state === 'orbiting') {
             proj.orbitAngle += proj.orbitSpeed;
             proj.x = Player.entity.x + Math.cos(proj.orbitAngle) * proj.orbitRadius;
             proj.y = Player.entity.y + Math.sin(proj.orbitAngle) * proj.orbitRadius;
-            // Hit detection ...
             for (let j = Monsters.active.length - 1; j >= 0; j--) {
                 const m = Monsters.active[j];
                 if (proj.targetsHit.includes(m)) continue;
@@ -181,10 +195,10 @@ const Projectiles = {
     drawBullet(ctx, proj) { ctx.shadowColor = proj.color; ctx.shadowBlur = 10; ctx.fillStyle = proj.color; ctx.beginPath(); ctx.arc(proj.x, proj.y, proj.size || 3, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0; ctx.strokeStyle = proj.color; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(proj.x - Math.cos(proj.angle) * 8, proj.y - Math.sin(proj.angle) * 8); ctx.lineTo(proj.x, proj.y); ctx.stroke(); },
     drawCrossbowBolt(ctx, proj) { ctx.save(); ctx.translate(proj.x, proj.y); ctx.rotate(proj.angle); ctx.fillStyle = '#8B4513'; ctx.fillRect(-15, -1, 30, 2); ctx.fillStyle = '#C0C0C0'; ctx.beginPath(); ctx.moveTo(15, -4); ctx.lineTo(25, 0); ctx.lineTo(15, 4); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#F00'; ctx.beginPath(); ctx.moveTo(-15, -3); ctx.lineTo(-25, -6); ctx.lineTo(-15, -1); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(-15, 3); ctx.lineTo(-25, 6); ctx.lineTo(-15, 1); ctx.closePath(); ctx.fill(); ctx.restore(); },
     drawThrownTridentProjectile(ctx, proj) {
-        // *** FIX: Tip points in movement direction, not perpendicular ***
+        // FIX: Tip points in movement direction (no more + Math.PI/2)
         ctx.save();
         ctx.translate(proj.x, proj.y);
-        ctx.rotate(proj.angle);   // removed + Math.PI/2
+        ctx.rotate(proj.angle);
         ctx.shadowColor = '#CD7F32';
         ctx.shadowBlur = 10;
         ctx.fillStyle = '#8B4513';
@@ -202,7 +216,7 @@ const Projectiles = {
     },
     drawDroppedTrident(weapon) { const ctx = Game.ctx; if (!Player.entity) return; const dist = Physics.distance(Player.entity, { x: weapon.thrownX, y: weapon.thrownY }); ctx.save(); ctx.translate(weapon.thrownX, weapon.thrownY); ctx.rotate(-0.3 + Math.sin(Date.now() * 0.002) * 0.1); ctx.shadowColor = dist < weapon.pickupRange ? '#FFD700' : '#CD7F32'; ctx.shadowBlur = dist < weapon.pickupRange ? 15 : 5; ctx.fillStyle = '#8B4513'; ctx.fillRect(-2, -25, 4, 35); ctx.strokeStyle = '#FFD700'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, -25); ctx.lineTo(-8, -35); ctx.moveTo(0, -25); ctx.lineTo(8, -35); ctx.moveTo(0, -25); ctx.lineTo(0, -38); ctx.stroke(); ctx.restore(); if (dist < weapon.pickupRange) { weapon.isThrown = false; weapon.thrownX = 0; weapon.thrownY = 0; Messages.show('Trident retrieved!', 1000); } },
     drawBoomerang(ctx, proj) {
-        proj.rotation = (proj.rotation || 0) + (proj.state === 'thrown' ? 0.2 : 0.15); // faster spin when thrown
+        proj.rotation = (proj.rotation || 0) + (proj.state === 'thrown' ? 0.2 : 0.15);
         if (boomerangProjImage.complete && boomerangProjImage.naturalWidth > 0) {
             ctx.save();
             ctx.translate(proj.x, proj.y);
