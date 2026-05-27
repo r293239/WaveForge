@@ -26,43 +26,74 @@ const RangedWeapons = {
     },
     
     createBoomerang(weapon, x, y, angle, time) {
-        // Only one boomerang can be in flight (unless doubleThrow)
+        // Limit to one boomerang unless doubleThrow
         if (!weapon.doubleThrow) {
-            const existingBoomerang = Projectiles.active.find(p => p.weaponId === 'boomerang' && (p.orbiting || p.state !== 'orbiting'));
-            if (existingBoomerang) return null;
+            const existing = Projectiles.active.find(p => p.weaponId === 'boomerang' && !p.orbiting);
+            if (existing) return null;
         }
-        
-        // Determine throw direction: nearest monster, or player facing if none
-        let targetAngle = angle;
+
+        // Determine target position (nearest monster or a point in the thrown direction)
+        let targetX, targetY;
         if (Monsters.active.length > 0 && Player.entity) {
-            let nearest = null;
-            let nearestDist = Infinity;
+            let nearest = null, nd = Infinity;
             for (const m of Monsters.active) {
                 const d = Physics.distance(Player.entity, m);
-                if (d < nearestDist) {
-                    nearestDist = d;
-                    nearest = m;
-                }
+                if (d < nd) { nd = d; nearest = m; }
             }
             if (nearest) {
-                targetAngle = Math.atan2(nearest.y - Player.entity.y, nearest.x - Player.entity.x);
+                targetX = nearest.x;
+                targetY = nearest.y;
+            } else {
+                targetX = x + Math.cos(angle) * weapon.range;
+                targetY = y + Math.sin(angle) * weapon.range;
             }
+        } else {
+            targetX = x + Math.cos(angle) * weapon.range;
+            targetY = y + Math.sin(angle) * weapon.range;
         }
-        
+
+        // Build circular arc from player (P) to target (T) and back
+        const px = x, py = y;
+        const tx = targetX, ty = targetY;
+        const midX = (px + tx) / 2, midY = (py + ty) / 2;
+        const dx = tx - px, dy = ty - py;
+        const dist = Math.hypot(dx, dy) || 1;
+
+        // Perpendicular direction (choose one side for the arc)
+        const perpX = -dy / dist, perpY = dx / dist;
+        // Arc curvature (higher = tighter circle)
+        const arcFactor = 0.7;
+        const offset = dist * arcFactor;
+        const cx = midX + perpX * offset;
+        const cy = midY + perpY * offset;
+        const radius = Math.hypot(px - cx, py - cy);
+
+        const startAngle = Math.atan2(py - cy, px - cx);
+        const targetAngle = Math.atan2(ty - cy, tx - cx);
+
+        // Determine the shortest angular direction to sweep from start to target
+        let angleDiff = targetAngle - startAngle;
+        angleDiff = ((angleDiff % (Math.PI*2)) + Math.PI*2) % (Math.PI*2);
+        const direction = angleDiff <= Math.PI ? 1 : -1;
+
+        // Angular speed – based on linear speed and radius
+        const linearSpeed = 8;
+        const angleStep = linearSpeed / radius;
+
         return {
             type: 'ranged',
             x, y,
             startX: x, startY: y,
-            angle: targetAngle,
-            speed: 8,
+            angle: 0,
+            speed: 0,
             range: weapon.range,
             damage: weapon.baseDamage,
             color: weapon.projectileColor,
             weaponId: weapon.id,
             animation: 'boomerang',
             isBoomerang: true,
-            state: 'thrown',          // new state: thrown, returning, orbiting
-            curveRate: 0.04,         // how fast it curves (radians per frame)
+            state: 'thrown',           // 'thrown' → once it passes target it's returning
+            orbiting: false,
             distanceTraveled: 0,
             targetsHit: [],
             maxTargets: weapon.maxTargets || 4,
@@ -70,8 +101,16 @@ const RangedWeapons = {
             startTime: time,
             size: 4,
             weaponRef: weapon,
-            orbiting: false,         // no longer starts orbiting
-            doubleThrow: weapon.doubleThrow || false
+            // Arc data
+            arcCenterX: cx,
+            arcCenterY: cy,
+            arcRadius: radius,
+            arcStartAngle: startAngle,
+            arcTargetAngle: targetAngle,
+            arcDirection: direction,
+            arcAngleStep: angleStep,
+            currentArcAngle: startAngle,
+            passedTarget: false
         };
     },
     
