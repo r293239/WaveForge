@@ -44,18 +44,24 @@ const CONFIG = {
         easy: {
             playerDamage: 1.15,
             monsterHealth: 0.85,
+            monsterDamage: 0.8,
+            monsterCountMultiplier: 0.7,
             goldGain: 1.25,
             extraMonsters: -2
         },
         normal: {
             playerDamage: 1.0,
             monsterHealth: 1.0,
+            monsterDamage: 1.0,
+            monsterCountMultiplier: 1.0,
             goldGain: 1.0,
             extraMonsters: 0
         },
         impossible: {
             playerDamage: 0.9,
             monsterHealth: 1.1,
+            monsterDamage: 1.2,
+            monsterCountMultiplier: 1.3,
             goldGain: 0.5,
             extraMonsters: 3
         }
@@ -74,7 +80,7 @@ const CONFIG = {
         PLAYER: 0.6,
         MONSTER: 0.7,
         BOSS: 0.8,
-        MIN_SEPARATION: 5 // Minimum pixels between entities
+        MIN_SEPARATION: 5
     },
     
     // Arena
@@ -84,7 +90,6 @@ const CONFIG = {
     }
 };
 
-// Game state enum
 const GAME_STATE = {
     START: 'start',
     WAVE: 'wave',
@@ -94,7 +99,6 @@ const GAME_STATE = {
     WIN: 'win'
 };
 
-// Difficulty enum
 const DIFFICULTY = {
     EASY: 'easy',
     NORMAL: 'normal',
