@@ -17,6 +17,7 @@ const Player = {
     baseSpeed: 3,
     speedMultiplier: 1.0,
     lifeSteal: 0,
+    lifeStealRemainder: 0,          // NEW: fractional lifesteal accumulator
     criticalChance: 0,
     goldMultiplier: 0,
     healthRegen: 0,
@@ -81,6 +82,7 @@ const Player = {
         this.baseSpeed = CONFIG.PLAYER_START.speed;
         this.speedMultiplier = 1.0;
         this.lifeSteal = 0;
+        this.lifeStealRemainder = 0;
         this.criticalChance = 0;
         this.goldMultiplier = 0;
         this.healthRegen = 0;
