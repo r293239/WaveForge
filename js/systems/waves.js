@@ -146,10 +146,9 @@ const Waves = {
             Monsters.spawnWave(waveConfig, false);
         }
         
-        // Spawn landmine if owned
-        setTimeout(() => {
-            if (Towers.landmines.count > 0) Towers.spawnLandmine();
-        }, 500);
+        // ***** FIX: Deploy all towers at wave start (landmines, healing, turrets) *****
+        // This replaces the old single landmine spawn.
+        Towers.deployAll();
         
         HUD.updateStats();
         document.getElementById('monsterCount').textContent = `Monsters: ${Game.pendingSpawns}`;
