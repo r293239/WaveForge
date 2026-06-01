@@ -61,7 +61,7 @@ const Projectiles = {
             proj.currentArcAngle += proj.arcAngleStep * proj.arcDirection;
             proj.x = proj.arcCenterX + Math.cos(proj.currentArcAngle) * proj.arcRadius;
             proj.y = proj.arcCenterY + Math.sin(proj.currentArcAngle) * proj.arcRadius;
-            proj.distanceTraveled += proj.arcAngleStep * proj.arcRadius;  // approximate
+            proj.distanceTraveled += proj.arcAngleStep * proj.arcRadius;
 
             // Check if we've passed the target angle
             if (!proj.passedTarget) {
@@ -78,7 +78,6 @@ const Projectiles = {
                 if (Physics.distance(proj, m) < m.radius + (proj.size || 4)) {
                     this.applyProjectileDamage(proj, m, j, index);
                     proj.targetsHit.push(m);
-                    // If max targets reached, transition to returning early
                     if (proj.targetsHit.length >= (proj.maxTargets || 4)) {
                         proj.state = 'returning';
                         proj.speed = 12;
@@ -89,11 +88,9 @@ const Projectiles = {
                 }
             }
 
-            // Check if boomerang has completed the full circle and is back near the player
             const dx = Player.entity.x - proj.x;
             const dy = Player.entity.y - proj.y;
             const distToPlayer = Math.hypot(dx, dy);
-            // Return to player if we've passed the target and are close enough
             if (proj.passedTarget && distToPlayer < 40) {
                 proj.state = 'returning';
                 proj.speed = 12;
@@ -101,7 +98,6 @@ const Projectiles = {
                 return;
             }
 
-            // Safety: if it goes too far, force return
             if (proj.distanceTraveled > proj.range * 2) {
                 proj.state = 'returning';
                 proj.speed = 12;
@@ -115,7 +111,6 @@ const Projectiles = {
             const dy = Player.entity.y - proj.y;
             const dist = Math.hypot(dx, dy);
             if (dist < 20) {
-                // Caught – remove projectile or reset for next throw
                 this.active.splice(index, 1);
                 return;
             }
@@ -124,7 +119,6 @@ const Projectiles = {
             proj.x += Math.cos(proj.angle) * proj.speed;
             proj.y += Math.sin(proj.angle) * proj.speed;
 
-            // Deal damage while returning
             for (let j = Monsters.active.length - 1; j >= 0; j--) {
                 const m = Monsters.active[j];
                 if (proj.targetsHit.includes(m)) continue;
@@ -137,7 +131,7 @@ const Projectiles = {
             return;
         }
 
-        // Fallback for old orbiting state (should not be used with new creation)
+        // Fallback orbiting (old state, shouldn't happen)
         if (proj.state === 'orbiting') {
             proj.orbitAngle += proj.orbitSpeed;
             proj.x = Player.entity.x + Math.cos(proj.orbitAngle) * proj.orbitRadius;
@@ -173,7 +167,19 @@ const Projectiles = {
     applyProjectileDamage(proj, monster, mi, pi) {
         let dmg = proj.damage * Player.damageMultiplier * Game.difficultyMultipliers.playerDamage;
         if (Math.random() < Player.criticalChance) { dmg *= 2; Effects.damageIndicator(monster.x, monster.y, Math.floor(dmg), true); } else Effects.damageIndicator(monster.x, monster.y, Math.floor(dmg), false);
-        monster.health -= dmg; if (Player.lifeSteal > 0) { const h = Math.floor(dmg * Player.lifeSteal); if (h > 0) Player.heal(h); }
+        monster.health -= dmg;
+        
+        // Lifesteal with accumulator
+        if (Player.lifeSteal > 0) {
+            const rawHeal = dmg * Player.lifeSteal;
+            Player.lifeStealRemainder += rawHeal;
+            if (Player.lifeStealRemainder >= 1) {
+                const healAmount = Math.floor(Player.lifeStealRemainder);
+                Player.heal(healAmount);
+                Player.lifeStealRemainder -= healAmount;
+            }
+        }
+        
         if (proj.weaponRef && proj.weaponRef.isThrowable) proj.weaponRef.trackKnifeHit(monster);
         if (proj.weaponRef && proj.weaponRef.explosiveShot) { const er = proj.weaponRef.explosiveRadius || 50, ed = proj.weaponRef.explosiveDamage || 25; Effects.explosion(monster.x, monster.y, er, '#FF6600'); for (let k = Monsters.active.length - 1; k >= 0; k--) { if (k === mi) continue; const o = Monsters.active[k]; if (Physics.distance(monster, o) < er + o.radius) { o.health -= ed; Effects.damageIndicator(o.x, o.y, ed, false); if (o.health <= 0) Monsters.handleDeath(o, k); } } }
         if (!proj.isBoomerang && !proj.bounceCount && !proj.isThrownTrident) this.active.splice(pi, 1);
@@ -195,7 +201,7 @@ const Projectiles = {
     drawBullet(ctx, proj) { ctx.shadowColor = proj.color; ctx.shadowBlur = 10; ctx.fillStyle = proj.color; ctx.beginPath(); ctx.arc(proj.x, proj.y, proj.size || 3, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0; ctx.strokeStyle = proj.color; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(proj.x - Math.cos(proj.angle) * 8, proj.y - Math.sin(proj.angle) * 8); ctx.lineTo(proj.x, proj.y); ctx.stroke(); },
     drawCrossbowBolt(ctx, proj) { ctx.save(); ctx.translate(proj.x, proj.y); ctx.rotate(proj.angle); ctx.fillStyle = '#8B4513'; ctx.fillRect(-15, -1, 30, 2); ctx.fillStyle = '#C0C0C0'; ctx.beginPath(); ctx.moveTo(15, -4); ctx.lineTo(25, 0); ctx.lineTo(15, 4); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#F00'; ctx.beginPath(); ctx.moveTo(-15, -3); ctx.lineTo(-25, -6); ctx.lineTo(-15, -1); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(-15, 3); ctx.lineTo(-25, 6); ctx.lineTo(-15, 1); ctx.closePath(); ctx.fill(); ctx.restore(); },
     drawThrownTridentProjectile(ctx, proj) {
-        // FIX: Tip points in movement direction (no more + Math.PI/2)
+        // FIX: Tip points in movement direction (no + Math.PI/2)
         ctx.save();
         ctx.translate(proj.x, proj.y);
         ctx.rotate(proj.angle);
