@@ -34,7 +34,7 @@ const Monsters = {
             damage = waveConfig.monsterDamage * type.damageMultiplier;
         } else {
             health = Math.floor(waveConfig.monsterHealth * type.healthMultiplier * Game.difficultyMultipliers.monsterHealth);
-            damage = Math.floor(waveConfig.monsterDamage * type.damageMultiplier);
+            damage = Math.floor(waveConfig.monsterDamage * type.damageMultiplier * (Game.difficultyMultipliers.monsterDamage || 1));
         }
         let x, y;
         if (spawnX !== null && spawnY !== null) { x = spawnX; y = spawnY; }
@@ -70,7 +70,9 @@ const Monsters = {
     },
     
     spawnWave(waveConfig, isBossWave) {
-        const totalMonsters = waveConfig.monsters;
+        const countMultiplier = Game.difficultyMultipliers.monsterCountMultiplier || 1;
+        const totalMonsters = Math.max(1, Math.floor(waveConfig.monsters * countMultiplier));
+        
         const monsterTypes = isBossWave ? Waves.getNonBossTypesForWave(Game.wave) : Waves.getMonsterTypesForWave(Game.wave);
         const tasks = [];
         for (let i = 0; i < totalMonsters; i++) {
@@ -248,6 +250,7 @@ const Monsters = {
         }
     },
     
+    // The following draw methods are unchanged from original
     drawNormalAttack(ctx, monster, progress, alpha) {
         const biteProgress = Math.sin(progress * Math.PI), jawOpen = biteProgress * 12, dist = monster.attackRange * progress;
         ctx.fillStyle = `rgba(255,107,107,${alpha})`;
