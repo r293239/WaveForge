@@ -3,29 +3,46 @@
 // ============================================
 
 const Arena = {
-    // Arena boundaries
+    // How much to shift the arena left/up (pixels)
+    shiftX: 38,   // 1 cm left (negative if you ever want right)
+    shiftY: 38,   // 1 cm up
+
+    // Arena boundaries (calculated in init)
     bounds: {
-        minX: CONFIG.ARENA.BOUNDARY_PADDING,
-        minY: CONFIG.ARENA.BOUNDARY_PADDING,
-        maxX: CONFIG.CANVAS_WIDTH - CONFIG.ARENA.BOUNDARY_PADDING,
-        maxY: CONFIG.CANVAS_HEIGHT - CONFIG.ARENA.BOUNDARY_PADDING
+        minX: 0,
+        minY: 0,
+        maxX: 0,
+        maxY: 0
     },
-    
+
     // Wall entities (for future obstacles)
     walls: [],
-    
+
     // Decorative elements
     decorations: [],
-    
+
     init() {
         this.walls = [];
         this.decorations = [];
+
+        // Calculate actual paddings with shift, clamped to keep arena on canvas
+        const padLeft   = Math.max(0, CONFIG.ARENA.BOUNDARY_PADDING - this.shiftX);
+        const padTop    = Math.max(0, CONFIG.ARENA.BOUNDARY_PADDING - this.shiftY);
+        const padRight  = Math.max(0, CONFIG.ARENA.BOUNDARY_PADDING + this.shiftX);
+        const padBottom = Math.max(0, CONFIG.ARENA.BOUNDARY_PADDING + this.shiftY);
+
+        this.bounds = {
+            minX: padLeft,
+            minY: padTop,
+            maxX: CONFIG.CANVAS_WIDTH - padRight,
+            maxY: CONFIG.CANVAS_HEIGHT - padBottom
+        };
+
         this.generateDecorations();
     },
-    
+
     // Generate random decorative elements
     generateDecorations() {
-        // Add some ground cracks/patterns
         for (let i = 0; i < 8; i++) {
             this.decorations.push({
                 x: Math.random() * (this.bounds.maxX - this.bounds.minX) + this.bounds.minX,
@@ -35,21 +52,20 @@ const Arena = {
             });
         }
     },
-    
+
     // Get arena boundaries
     getBounds() {
         return { ...this.bounds };
     },
-    
+
     // Get random spawn position outside a radius from center
     getRandomSpawnPosition(minDistFromCenter = 100, minDistFromPlayer = 150) {
         let x, y, valid = false;
         const centerX = CONFIG.CANVAS_WIDTH / 2;
         const centerY = CONFIG.CANVAS_HEIGHT / 2;
         const player = Player.entity;
-        
+
         for (let attempts = 0; attempts < 50; attempts++) {
-            // Spawn from edges
             const side = Math.floor(Math.random() * 4);
             switch (side) {
                 case 0: // Top
@@ -68,33 +84,31 @@ const Arena = {
                     x = this.bounds.minX;
                     y = this.bounds.minY + Math.random() * (this.bounds.maxY - this.bounds.minY);
             }
-            
-            // Check distance from center
+
             if (Math.hypot(x - centerX, y - centerY) >= minDistFromCenter) {
-                // Check distance from player
                 if (!player || Math.hypot(x - player.x, y - player.y) >= minDistFromPlayer) {
                     valid = true;
                     break;
                 }
             }
         }
-        
+
         if (!valid) {
             x = this.bounds.minX + Math.random() * (this.bounds.maxX - this.bounds.minX);
             y = this.bounds.minY;
         }
-        
+
         return { x, y };
     },
-    
+
     // Get random position inside arena (not too close to edges)
     getRandomArenaPosition(margin = 50) {
         return {
-            x: margin + Math.random() * (CONFIG.CANVAS_WIDTH - margin * 2),
-            y: margin + Math.random() * (CONFIG.CANVAS_HEIGHT - margin * 2)
+            x: this.bounds.minX + margin + Math.random() * (this.bounds.maxX - this.bounds.minX - margin * 2),
+            y: this.bounds.minY + margin + Math.random() * (this.bounds.maxY - this.bounds.minY - margin * 2)
         };
     },
-    
+
     // Check if position is within arena bounds
     isInBounds(x, y, radius = 0) {
         return x - radius >= this.bounds.minX &&
@@ -102,7 +116,7 @@ const Arena = {
                y - radius >= this.bounds.minY &&
                y + radius <= this.bounds.maxY;
     },
-    
+
     // Add a wall/obstacle (for future use)
     addWall(x, y, width, height) {
         const wall = {
@@ -115,7 +129,7 @@ const Arena = {
         Physics.register(wall);
         return wall;
     },
-    
+
     // Remove all walls
     clearWalls() {
         for (let wall of this.walls) {
@@ -123,71 +137,74 @@ const Arena = {
         }
         this.walls = [];
     },
-    
+
     // Draw arena
     draw() {
         const ctx = Game.ctx;
-        
-        // Draw arena boundaries
+
+        // Use the actual (shifted) bounds
+        const b = this.bounds;
+
+        // Draw arena boundary
         ctx.strokeStyle = 'rgba(100, 100, 150, 0.5)';
         ctx.lineWidth = CONFIG.ARENA.WALL_THICKNESS;
         ctx.strokeRect(
-            this.bounds.minX - 5,
-            this.bounds.minY - 5,
-            this.bounds.maxX - this.bounds.minX + 10,
-            this.bounds.maxY - this.bounds.minY + 10
+            b.minX - 5,
+            b.minY - 5,
+            b.maxX - b.minX + 10,
+            b.maxY - b.minY + 10
         );
-        
-        // Draw corner markers
+
+        // Corner markers
         const cornerSize = 15;
         ctx.strokeStyle = 'rgba(255, 200, 0, 0.3)';
         ctx.lineWidth = 2;
-        
-        // Top-left corner
+
+        // Top-left
         ctx.beginPath();
-        ctx.moveTo(this.bounds.minX, this.bounds.minY + cornerSize);
-        ctx.lineTo(this.bounds.minX, this.bounds.minY);
-        ctx.lineTo(this.bounds.minX + cornerSize, this.bounds.minY);
+        ctx.moveTo(b.minX, b.minY + cornerSize);
+        ctx.lineTo(b.minX, b.minY);
+        ctx.lineTo(b.minX + cornerSize, b.minY);
         ctx.stroke();
-        
-        // Top-right corner
+
+        // Top-right
         ctx.beginPath();
-        ctx.moveTo(this.bounds.maxX - cornerSize, this.bounds.minY);
-        ctx.lineTo(this.bounds.maxX, this.bounds.minY);
-        ctx.lineTo(this.bounds.maxX, this.bounds.minY + cornerSize);
+        ctx.moveTo(b.maxX - cornerSize, b.minY);
+        ctx.lineTo(b.maxX, b.minY);
+        ctx.lineTo(b.maxX, b.minY + cornerSize);
         ctx.stroke();
-        
-        // Bottom-left corner
+
+        // Bottom-left
         ctx.beginPath();
-        ctx.moveTo(this.bounds.minX, this.bounds.maxY - cornerSize);
-        ctx.lineTo(this.bounds.minX, this.bounds.maxY);
-        ctx.lineTo(this.bounds.minX + cornerSize, this.bounds.maxY);
+        ctx.moveTo(b.minX, b.maxY - cornerSize);
+        ctx.lineTo(b.minX, b.maxY);
+        ctx.lineTo(b.minX + cornerSize, b.maxY);
         ctx.stroke();
-        
-        // Bottom-right corner
+
+        // Bottom-right
         ctx.beginPath();
-        ctx.moveTo(this.bounds.maxX, this.bounds.maxY - cornerSize);
-        ctx.lineTo(this.bounds.maxX, this.bounds.maxY);
-        ctx.lineTo(this.bounds.maxX - cornerSize, this.bounds.maxY);
+        ctx.moveTo(b.maxX, b.maxY - cornerSize);
+        ctx.lineTo(b.maxX, b.maxY);
+        ctx.lineTo(b.maxX - cornerSize, b.maxY);
         ctx.stroke();
-        
-        // Draw decorative elements
+
+        // Decorative elements (unchanged, but they were placed within bounds anyway)
         for (let deco of this.decorations) {
             ctx.fillStyle = `rgba(100, 100, 150, ${deco.alpha})`;
             ctx.beginPath();
             ctx.arc(deco.x, deco.y, deco.radius, 0, Math.PI * 2);
             ctx.fill();
         }
-        
-        // Draw walls
+
+        // Walls (unchanged)
         for (let wall of this.walls) {
             ctx.fillStyle = 'rgba(100, 100, 120, 0.5)';
             ctx.fillRect(wall.x - wall.width/2, wall.y - wall.height/2, wall.width, wall.height);
             ctx.strokeStyle = 'rgba(150, 150, 180, 0.7)';
             ctx.strokeRect(wall.x - wall.width/2, wall.y - wall.height/2, wall.width, wall.height);
         }
-        
-        // Draw grid
+
+        // Grid
         ctx.strokeStyle = 'rgba(100, 100, 150, 0.05)';
         ctx.lineWidth = 1;
         for (let x = 0; x < CONFIG.CANVAS_WIDTH; x += 50) {
