@@ -26,13 +26,12 @@ const RangedWeapons = {
     },
     
     createBoomerang(weapon, x, y, angle, time) {
-        // Limit to one boomerang unless doubleThrow
         if (!weapon.doubleThrow) {
             const existing = Projectiles.active.find(p => p.weaponId === 'boomerang' && !p.orbiting);
             if (existing) return null;
         }
 
-        // Determine target position (nearest monster or a point in the thrown direction)
+        // Determine target position (nearest monster or aim direction)
         let targetX, targetY;
         if (Monsters.active.length > 0 && Player.entity) {
             let nearest = null, nd = Infinity;
@@ -52,16 +51,14 @@ const RangedWeapons = {
             targetY = y + Math.sin(angle) * weapon.range;
         }
 
-        // Build circular arc from player (P) to target (T) and back
+        // Build circular arc from player to target and back
         const px = x, py = y;
         const tx = targetX, ty = targetY;
         const midX = (px + tx) / 2, midY = (py + ty) / 2;
         const dx = tx - px, dy = ty - py;
         const dist = Math.hypot(dx, dy) || 1;
 
-        // Perpendicular direction (choose one side for the arc)
         const perpX = -dy / dist, perpY = dx / dist;
-        // Arc curvature (higher = tighter circle)
         const arcFactor = 0.7;
         const offset = dist * arcFactor;
         const cx = midX + perpX * offset;
@@ -71,12 +68,10 @@ const RangedWeapons = {
         const startAngle = Math.atan2(py - cy, px - cx);
         const targetAngle = Math.atan2(ty - cy, tx - cx);
 
-        // Determine the shortest angular direction to sweep from start to target
         let angleDiff = targetAngle - startAngle;
         angleDiff = ((angleDiff % (Math.PI*2)) + Math.PI*2) % (Math.PI*2);
         const direction = angleDiff <= Math.PI ? 1 : -1;
 
-        // Angular speed – based on linear speed and radius
         const linearSpeed = 8;
         const angleStep = linearSpeed / radius;
 
@@ -84,15 +79,14 @@ const RangedWeapons = {
             type: 'ranged',
             x, y,
             startX: x, startY: y,
-            angle: 0,
-            speed: 0,
+            angle: 0, speed: 0,
             range: weapon.range,
             damage: weapon.baseDamage,
             color: weapon.projectileColor,
             weaponId: weapon.id,
             animation: 'boomerang',
             isBoomerang: true,
-            state: 'thrown',           // 'thrown' → once it passes target it's returning
+            state: 'thrown',
             orbiting: false,
             distanceTraveled: 0,
             targetsHit: [],
@@ -101,7 +95,6 @@ const RangedWeapons = {
             startTime: time,
             size: 4,
             weaponRef: weapon,
-            // Arc data
             arcCenterX: cx,
             arcCenterY: cy,
             arcRadius: radius,
