@@ -1,3 +1,4 @@
+
 // ============================================
 // WAVEFORGE - Melee Weapons
 // ============================================
@@ -44,16 +45,19 @@ const MeleeWeapons = {
                     startTime: currentTime,
                     size: 8,
                     weaponRef: weapon,
-                    lightningStrike: weapon.lightningStrike
+                    lightningStrike: weapon.lightningStrike || false,
+                    state: 'thrown',          // NEW: for loyalty return
+                    returnSpeed: weapon.returnSpeed || 0,  // 0 if no loyalty
                 };
                 Projectiles.active.push(projectile);
                 return null;
             } else {
                 // Trident is thrown - use weak melee instead
+                // Slightly stronger weak melee to make it less useless
                 return {
                     type: 'melee', x: playerX, y: playerY,
-                    radius: 30,
-                    damage: weapon.baseDamage * 0.3,
+                    radius: 35,                       // was 30
+                    damage: weapon.baseDamage * 0.4,  // was 0.3
                     color: weapon.swingColor,
                     startTime: currentTime,
                     duration: 200,
