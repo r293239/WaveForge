@@ -4,7 +4,10 @@
 
 const WeaponBase = {
     create(weaponData, tier = 1) {
-        return new WeaponInstance(weaponData, tier);
+        const instance = new WeaponInstance(weaponData, tier);
+        // Apply any stored upgrades for this weapon type (for merges, future pickups)
+        instance.applyStoredUpgrades();
+        return instance;
     }
 };
 
@@ -38,7 +41,7 @@ class WeaponInstance {
         if (this.usesAmmo) {
             this.magazineSize = weaponData.magazineSize;
             this.currentAmmo = this.magazineSize;
-            this.reloadTime = weaponData.reloadTime;
+            this.reloadTime = weaponData.reloadTime || 0;
             this.isReloading = false;
             this.reloadStart = 0;
         }
@@ -97,7 +100,7 @@ class WeaponInstance {
         this.isThrown = false;
         this.thrownX = 0;
         this.thrownY = 0;
-        this.pickupRange = 40;
+        this.pickupRange = weaponData.pickupRange || 80;   // increased default
         
         this.tierMultipliers = weaponData.tierMultipliers || {};
         this.applyTierBonuses();
@@ -121,8 +124,26 @@ class WeaponInstance {
         }
     }
     
+    // Apply any stored weapon upgrades from Game.weaponUpgrades[this.id]
+    applyStoredUpgrades() {
+        if (!Game.weaponUpgrades || !Game.weaponUpgrades[this.id]) return;
+        const upgradeId = Game.weaponUpgrades[this.id];
+        const upgrade = WEAPON_UPGRADES.find(u => u.id === upgradeId);
+        if (upgrade) {
+            // Re-apply the upgrade effects
+            Upgrades.applyWeaponUpgradeSilent(upgrade, this);
+        }
+    }
+    
     canAttack(currentTime) {
         if (this.isReloading) return false;
+        
+        // Spear special: allow weak melee when thrown, even with 0 ammo
+        if (this.id === 'spear' && this.isThrown) {
+            // Weak melee always available
+            return (currentTime - this.lastAttack) >= (1000 / (this.attackSpeed * Player.attackSpeedMultiplier));
+        }
+        
         if (this.usesAmmo && this.currentAmmo <= 0) {
             if (!this.isThrowable) this.startReload();
             return false;
@@ -146,6 +167,8 @@ class WeaponInstance {
     
     useAmmo() {
         if (!this.usesAmmo) return;
+        // Don't consume ammo for spear's weak melee
+        if (this.id === 'spear' && this.isThrown) return;
         this.currentAmmo--;
         if (this.currentAmmo <= 0 && !this.isThrowable) this.startReload();
     }
@@ -219,10 +242,7 @@ class WeaponInstance {
     }
     
     getMergeCost(other) {
-        if (this.id === other.id && this.tier === other.tier && this.tier < 5) {
-            return Math.floor(this.baseCost * 0.3 * this.tier);
-        }
-        return 0;
+        return 0;   // <-- MERGING IS NOW FREE
     }
     
     merge(other) {
