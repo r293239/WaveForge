@@ -53,17 +53,16 @@ const Projectiles = {
         }
     },
     
+    // ---- BOOMERANG (arc flight, return) ----
     updateBoomerang(proj, index) {
         if (!Player.entity) { this.active.splice(index, 1); return; }
 
         if (proj.state === 'thrown') {
-            // Advance along the circular arc
             proj.currentArcAngle += proj.arcAngleStep * proj.arcDirection;
             proj.x = proj.arcCenterX + Math.cos(proj.currentArcAngle) * proj.arcRadius;
             proj.y = proj.arcCenterY + Math.sin(proj.currentArcAngle) * proj.arcRadius;
             proj.distanceTraveled += proj.arcAngleStep * proj.arcRadius;
 
-            // Check if we've passed the target angle
             if (!proj.passedTarget) {
                 const diff = proj.currentArcAngle - proj.arcStartAngle;
                 const targetDiff = proj.arcTargetAngle - proj.arcStartAngle;
@@ -71,7 +70,6 @@ const Projectiles = {
                 else if (proj.arcDirection === -1 && diff <= targetDiff) proj.passedTarget = true;
             }
 
-            // Hit detection
             for (let j = Monsters.active.length - 1; j >= 0; j--) {
                 const m = Monsters.active[j];
                 if (proj.targetsHit.includes(m)) continue;
@@ -88,16 +86,13 @@ const Projectiles = {
                 }
             }
 
-            const dx = Player.entity.x - proj.x;
-            const dy = Player.entity.y - proj.y;
-            const distToPlayer = Math.hypot(dx, dy);
+            const dx = Player.entity.x - proj.x, dy = Player.entity.y - proj.y, distToPlayer = Math.hypot(dx, dy);
             if (proj.passedTarget && distToPlayer < 40) {
                 proj.state = 'returning';
                 proj.speed = 12;
                 proj.angle = Math.atan2(dy, dx);
                 return;
             }
-
             if (proj.distanceTraveled > proj.range * 2) {
                 proj.state = 'returning';
                 proj.speed = 12;
@@ -105,20 +100,13 @@ const Projectiles = {
             }
             return;
         }
-
         if (proj.state === 'returning') {
-            const dx = Player.entity.x - proj.x;
-            const dy = Player.entity.y - proj.y;
-            const dist = Math.hypot(dx, dy);
-            if (dist < 20) {
-                this.active.splice(index, 1);
-                return;
-            }
+            const dx = Player.entity.x - proj.x, dy = Player.entity.y - proj.y, dist = Math.hypot(dx, dy);
+            if (dist < 20) { this.active.splice(index, 1); return; }
             proj.angle = Math.atan2(dy, dx);
             proj.speed = 12;
             proj.x += Math.cos(proj.angle) * proj.speed;
             proj.y += Math.sin(proj.angle) * proj.speed;
-
             for (let j = Monsters.active.length - 1; j >= 0; j--) {
                 const m = Monsters.active[j];
                 if (proj.targetsHit.includes(m)) continue;
@@ -130,8 +118,6 @@ const Projectiles = {
             }
             return;
         }
-
-        // Fallback orbiting (old state, shouldn't happen)
         if (proj.state === 'orbiting') {
             proj.orbitAngle += proj.orbitSpeed;
             proj.x = Player.entity.x + Math.cos(proj.orbitAngle) * proj.orbitRadius;
@@ -155,21 +141,106 @@ const Projectiles = {
         }
     },
     
+    // ---- THROWN TRIDENT (Loyalty & Channeling) ----
     updateThrownTrident(proj, index) {
-        if (proj.distanceTraveled > proj.range || !Arena.isInBounds(proj.x, proj.y)) { this.dropTrident(proj, index); return; }
-        for (let j = Monsters.active.length - 1; j >= 0; j--) { const m = Monsters.active[j]; if (proj.piercedEnemies.includes(m)) continue; if (Physics.distance(proj, m) < m.radius + (proj.size || 4)) { let dmg = proj.damage * Player.damageMultiplier * Game.difficultyMultipliers.playerDamage; m.health -= dmg; Effects.damageIndicator(m.x, m.y, Math.floor(dmg), false); if (proj.lightningStrike) this.applyLightningStrike(m); proj.piercedEnemies.push(m); if (proj.piercedEnemies.length > proj.pierceCount) { this.dropTrident(proj, index); return; } if (m.health <= 0) Monsters.handleDeath(m, j); } }
+        if (!Player.entity) { this.active.splice(index, 1); return; }
+
+        if (proj.state === 'thrown') {
+            // Hit detection
+            for (let j = Monsters.active.length - 1; j >= 0; j--) {
+                const m = Monsters.active[j];
+                if (proj.piercedEnemies.includes(m)) continue;
+                if (Physics.distance(proj, m) < m.radius + (proj.size || 4)) {
+                    let dmg = proj.damage * Player.damageMultiplier * Game.difficultyMultipliers.playerDamage;
+                    m.health -= dmg;
+                    Effects.damageIndicator(m.x, m.y, Math.floor(dmg), false);
+                    if (proj.lightningStrike) this.applyLightningStrike(m);
+                    proj.piercedEnemies.push(m);
+                    
+                    if (proj.piercedEnemies.length > proj.pierceCount) {
+                        if (proj.returnSpeed > 0) {
+                            proj.state = 'returning';
+                            proj.speed = proj.returnSpeed;
+                            proj.angle = Math.atan2(Player.entity.y - proj.y, Player.entity.x - proj.x);
+                            return;
+                        } else {
+                            this.dropTrident(proj, index);
+                            return;
+                        }
+                    }
+                    if (m.health <= 0) Monsters.handleDeath(m, j);
+                }
+            }
+            
+            // Range exceeded
+            if (proj.distanceTraveled > proj.range || !Arena.isInBounds(proj.x, proj.y)) {
+                if (proj.returnSpeed > 0) {
+                    proj.state = 'returning';
+                    proj.speed = proj.returnSpeed;
+                    proj.angle = Math.atan2(Player.entity.y - proj.y, Player.entity.x - proj.x);
+                    return;
+                } else {
+                    this.dropTrident(proj, index);
+                    return;
+                }
+            }
+        }
+        else if (proj.state === 'returning') {
+            const dx = Player.entity.x - proj.x, dy = Player.entity.y - proj.y;
+            const distToPlayer = Math.hypot(dx, dy);
+            if (distToPlayer < 20) {
+                this.retrieveTrident(proj, index);
+                return;
+            }
+            proj.angle = Math.atan2(dy, dx);
+            proj.x += Math.cos(proj.angle) * proj.speed;
+            proj.y += Math.sin(proj.angle) * proj.speed;
+            
+            // Deal damage on return
+            for (let j = Monsters.active.length - 1; j >= 0; j--) {
+                const m = Monsters.active[j];
+                if (proj.piercedEnemies.includes(m)) continue;
+                if (Physics.distance(proj, m) < m.radius + (proj.size || 4)) {
+                    let dmg = proj.damage * Player.damageMultiplier * Game.difficultyMultipliers.playerDamage;
+                    m.health -= dmg;
+                    Effects.damageIndicator(m.x, m.y, Math.floor(dmg), false);
+                    if (proj.lightningStrike) this.applyLightningStrike(m);
+                    proj.piercedEnemies.push(m);
+                    if (m.health <= 0) Monsters.handleDeath(m, j);
+                }
+            }
+        }
     },
     
-    dropTrident(proj, index) { proj.speed = 0; if (proj.weaponRef) { proj.weaponRef.isThrown = true; proj.weaponRef.thrownX = proj.x; proj.weaponRef.thrownY = proj.y; } this.active.splice(index, 1); },
+    dropTrident(proj, index) {
+        proj.speed = 0;
+        if (proj.weaponRef) {
+            proj.weaponRef.isThrown = true;
+            proj.weaponRef.thrownX = proj.x;
+            proj.weaponRef.thrownY = proj.y;
+        }
+        this.active.splice(index, 1);
+    },
+    
+    retrieveTrident(proj, index) {
+        if (proj.weaponRef) {
+            proj.weaponRef.isThrown = false;
+            proj.weaponRef.thrownX = 0;
+            proj.weaponRef.thrownY = 0;
+            if (proj.weaponRef.usesAmmo) {
+                proj.weaponRef.currentAmmo = proj.weaponRef.magazineSize;
+            }
+        }
+        this.active.splice(index, 1);
+    },
     
     applyLightningStrike(monster) { const targets = [monster]; for (let i = 0; i < 3; i++) { const last = targets[targets.length-1]; let nearest = null, nd = 100; for (let o of Monsters.active) { if (targets.includes(o)) continue; const d = Physics.distance(last, o); if (d < nd) { nd = d; nearest = o; } } if (nearest) targets.push(nearest); else break; } for (let i = 0; i < targets.length; i++) { targets[i].health -= 25; Effects.damageIndicator(targets[i].x, targets[i].y, 25, true); if (i > 0) Effects.lightningBolt(targets[i-1].x, targets[i-1].y, targets[i].x, targets[i].y); } },
     
+    // ---- DAMAGE APPLICATION (with lifesteal accumulator) ----
     applyProjectileDamage(proj, monster, mi, pi) {
         let dmg = proj.damage * Player.damageMultiplier * Game.difficultyMultipliers.playerDamage;
         if (Math.random() < Player.criticalChance) { dmg *= 2; Effects.damageIndicator(monster.x, monster.y, Math.floor(dmg), true); } else Effects.damageIndicator(monster.x, monster.y, Math.floor(dmg), false);
         monster.health -= dmg;
-        
-        // Lifesteal with accumulator
         if (Player.lifeSteal > 0) {
             const rawHeal = dmg * Player.lifeSteal;
             Player.lifeStealRemainder += rawHeal;
@@ -179,7 +250,6 @@ const Projectiles = {
                 Player.lifeStealRemainder -= healAmount;
             }
         }
-        
         if (proj.weaponRef && proj.weaponRef.isThrowable) proj.weaponRef.trackKnifeHit(monster);
         if (proj.weaponRef && proj.weaponRef.explosiveShot) { const er = proj.weaponRef.explosiveRadius || 50, ed = proj.weaponRef.explosiveDamage || 25; Effects.explosion(monster.x, monster.y, er, '#FF6600'); for (let k = Monsters.active.length - 1; k >= 0; k--) { if (k === mi) continue; const o = Monsters.active[k]; if (Physics.distance(monster, o) < er + o.radius) { o.health -= ed; Effects.damageIndicator(o.x, o.y, ed, false); if (o.health <= 0) Monsters.handleDeath(o, k); } } }
         if (!proj.isBoomerang && !proj.bounceCount && !proj.isThrownTrident) this.active.splice(pi, 1);
@@ -187,9 +257,11 @@ const Projectiles = {
         if (monster.health <= 0) Monsters.handleDeath(monster, mi);
     },
     
+    // ---- BOSS / MONSTER PROJECTILES ----
     updateBossProjectiles(currentTime) { for (let i = this.bossProjectiles.length - 1; i >= 0; i--) { const p = this.bossProjectiles[i]; p.x += Math.cos(p.angle) * p.speed; p.y += Math.sin(p.angle) * p.speed; if (currentTime - p.startTime > p.lifetime) { this.bossProjectiles.splice(i, 1); continue; } if (Player.entity && Physics.distance(p, Player.entity) < p.radius + Player.entity.radius) { Player.takeDamage(p.damage); this.bossProjectiles.splice(i, 1); } } },
     updateMonsterProjectiles(currentTime) { for (let i = this.monsterProjectiles.length - 1; i >= 0; i--) { const p = this.monsterProjectiles[i]; p.x += Math.cos(p.angle) * p.speed; p.y += Math.sin(p.angle) * p.speed; if (currentTime - p.startTime > p.lifetime) { this.monsterProjectiles.splice(i, 1); continue; } if (Player.entity && Physics.distance(p, Player.entity) < 5 + Player.entity.radius) { Player.takeDamage(p.damage); this.monsterProjectiles.splice(i, 1); } } },
     
+    // ---- DRAWING ----
     draw() {
         const ctx = Game.ctx;
         for (let proj of this.active) { ctx.save(); if (proj.isBoomerang) this.drawBoomerang(ctx, proj); else if (proj.isThrownTrident) this.drawThrownTridentProjectile(ctx, proj); else if (proj.animation === 'knife') this.drawKnife(ctx, proj); else if (proj.animation === 'laser') this.drawLaser(ctx, proj); else if (proj.animation === 'sniper') this.drawSniper(ctx, proj); else if (proj.animation === 'bolt') this.drawCrossbowBolt(ctx, proj); else this.drawBullet(ctx, proj); ctx.restore(); }
@@ -201,17 +273,15 @@ const Projectiles = {
     drawBullet(ctx, proj) { ctx.shadowColor = proj.color; ctx.shadowBlur = 10; ctx.fillStyle = proj.color; ctx.beginPath(); ctx.arc(proj.x, proj.y, proj.size || 3, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0; ctx.strokeStyle = proj.color; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(proj.x - Math.cos(proj.angle) * 8, proj.y - Math.sin(proj.angle) * 8); ctx.lineTo(proj.x, proj.y); ctx.stroke(); },
     drawCrossbowBolt(ctx, proj) { ctx.save(); ctx.translate(proj.x, proj.y); ctx.rotate(proj.angle); ctx.fillStyle = '#8B4513'; ctx.fillRect(-15, -1, 30, 2); ctx.fillStyle = '#C0C0C0'; ctx.beginPath(); ctx.moveTo(15, -4); ctx.lineTo(25, 0); ctx.lineTo(15, 4); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#F00'; ctx.beginPath(); ctx.moveTo(-15, -3); ctx.lineTo(-25, -6); ctx.lineTo(-15, -1); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(-15, 3); ctx.lineTo(-25, 6); ctx.lineTo(-15, 1); ctx.closePath(); ctx.fill(); ctx.restore(); },
     drawThrownTridentProjectile(ctx, proj) {
-        // FIX: Tip points in movement direction (no + Math.PI/2)
         ctx.save();
         ctx.translate(proj.x, proj.y);
-        ctx.rotate(proj.angle);
+        ctx.rotate(proj.angle);   // tip points forward
         ctx.shadowColor = '#CD7F32';
         ctx.shadowBlur = 10;
         ctx.fillStyle = '#8B4513';
-        ctx.fillRect(-15, -2, 30, 4);   // shaft from -15 to +15
+        ctx.fillRect(-15, -2, 30, 4);
         ctx.strokeStyle = '#FFD700';
         ctx.lineWidth = 2;
-        // Prongs at the tip (right end)
         ctx.beginPath();
         ctx.moveTo(15, 0); ctx.lineTo(8, -6);
         ctx.moveTo(15, 0); ctx.lineTo(8, 6);
@@ -220,35 +290,43 @@ const Projectiles = {
         ctx.stroke();
         ctx.restore();
     },
-    drawDroppedTrident(weapon) { const ctx = Game.ctx; if (!Player.entity) return; const dist = Physics.distance(Player.entity, { x: weapon.thrownX, y: weapon.thrownY }); ctx.save(); ctx.translate(weapon.thrownX, weapon.thrownY); ctx.rotate(-0.3 + Math.sin(Date.now() * 0.002) * 0.1); ctx.shadowColor = dist < weapon.pickupRange ? '#FFD700' : '#CD7F32'; ctx.shadowBlur = dist < weapon.pickupRange ? 15 : 5; ctx.fillStyle = '#8B4513'; ctx.fillRect(-2, -25, 4, 35); ctx.strokeStyle = '#FFD700'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, -25); ctx.lineTo(-8, -35); ctx.moveTo(0, -25); ctx.lineTo(8, -35); ctx.moveTo(0, -25); ctx.lineTo(0, -38); ctx.stroke(); ctx.restore(); if (dist < weapon.pickupRange) { weapon.isThrown = false; weapon.thrownX = 0; weapon.thrownY = 0; Messages.show('Trident retrieved!', 1000); } },
+    drawDroppedTrident(weapon) {
+        const ctx = Game.ctx; if (!Player.entity) return;
+        const dist = Physics.distance(Player.entity, { x: weapon.thrownX, y: weapon.thrownY });
+        ctx.save(); ctx.translate(weapon.thrownX, weapon.thrownY);
+        ctx.rotate(-0.3 + Math.sin(Date.now() * 0.002) * 0.1);
+        ctx.shadowColor = dist < weapon.pickupRange ? '#FFD700' : '#CD7F32';
+        ctx.shadowBlur = dist < weapon.pickupRange ? 15 : 5;
+        ctx.fillStyle = '#8B4513';
+        ctx.fillRect(-2, -25, 4, 35);
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, -25); ctx.lineTo(-8, -35);
+        ctx.moveTo(0, -25); ctx.lineTo(8, -35);
+        ctx.moveTo(0, -25); ctx.lineTo(0, -38);
+        ctx.stroke();
+        ctx.restore();
+        if (dist < weapon.pickupRange) {
+            weapon.isThrown = false;
+            weapon.thrownX = 0; weapon.thrownY = 0;
+            Messages.show('Trident retrieved!', 1000);
+        }
+    },
     drawBoomerang(ctx, proj) {
         proj.rotation = (proj.rotation || 0) + (proj.state === 'thrown' ? 0.2 : 0.15);
         if (boomerangProjImage.complete && boomerangProjImage.naturalWidth > 0) {
-            ctx.save();
-            ctx.translate(proj.x, proj.y);
-            ctx.rotate(proj.rotation);
-            ctx.shadowColor = '#8B4513';
-            ctx.shadowBlur = 10;
+            ctx.save(); ctx.translate(proj.x, proj.y); ctx.rotate(proj.rotation);
+            ctx.shadowColor = '#8B4513'; ctx.shadowBlur = 10;
             ctx.drawImage(boomerangProjImage, -20, -20, 40, 40);
             ctx.restore();
         } else {
-            ctx.save();
-            ctx.translate(proj.x, proj.y);
-            ctx.rotate(proj.rotation);
-            ctx.shadowColor = '#8B4513';
-            ctx.shadowBlur = 10;
-            ctx.fillStyle = '#8B4513';
-            ctx.strokeStyle = '#654321';
-            ctx.lineWidth = 2;
+            ctx.save(); ctx.translate(proj.x, proj.y); ctx.rotate(proj.rotation);
+            ctx.shadowColor = '#8B4513'; ctx.shadowBlur = 10;
+            ctx.fillStyle = '#8B4513'; ctx.strokeStyle = '#654321'; ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.moveTo(0, -5);
-            ctx.lineTo(20, -10);
-            ctx.lineTo(25, 0);
-            ctx.lineTo(20, 10);
-            ctx.lineTo(0, 5);
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
+            ctx.moveTo(0, -5); ctx.lineTo(20, -10); ctx.lineTo(25, 0); ctx.lineTo(20, 10); ctx.lineTo(0, 5);
+            ctx.closePath(); ctx.fill(); ctx.stroke();
             ctx.restore();
         }
     },
