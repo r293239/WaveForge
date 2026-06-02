@@ -131,6 +131,12 @@ const Upgrades = {
             weapon.currentAmmo = 1;
             weapon.resetEachRound = true;
         }
+        if (e.lightningStrike) {
+            weapon.lightningStrike = true;
+        }
+        if (e.removePierce) {
+            weapon.pierceCount = 1;   // remove piercing
+        }
         if (e.pelletCount) weapon.pelletCount = e.pelletCount;
         if (e.spreadAngle) weapon.spreadAngle = e.spreadAngle;
         if (e.spreadMult) weapon.spreadAngle = Math.floor(weapon.spreadAngle * e.spreadMult);
