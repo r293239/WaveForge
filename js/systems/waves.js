@@ -106,13 +106,24 @@ const Waves = {
         Player.inSlowField = false;
         Player.slowFieldTicks = 0;
         Player.speed = Player.baseSpeed * Player.speedMultiplier;
-        Player.weapons.forEach(w => { if (w.resetEachRound) w.resetAmmo(); });
+        
+        Player.weapons.forEach(w => {
+            if (w.resetEachRound) w.resetAmmo();
+            // Auto-retrieve thrown trident at wave start
+            if (w.id === 'spear' && w.isThrown) {
+                w.isThrown = false;
+                w.thrownX = 0;
+                w.thrownY = 0;
+                if (w.usesAmmo) w.currentAmmo = w.magazineSize;
+            }
+        });
         
         // Reset systems
         Monsters.reset();
         Boss.reset();
         Projectiles.reset();
         Physics.clear();
+        Towers.reset();          // <-- Clear old towers to prevent stacking
         
         const waveConfig = this.getWaveConfig(Game.wave);
         
@@ -146,8 +157,7 @@ const Waves = {
             Monsters.spawnWave(waveConfig, false);
         }
         
-        // ***** FIX: Deploy all towers at wave start (landmines, healing, turrets) *****
-        // This replaces the old single landmine spawn.
+        // Deploy all towers (landmines, healing towers, turrets) – fresh start each wave
         Towers.deployAll();
         
         HUD.updateStats();
