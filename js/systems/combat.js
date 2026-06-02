@@ -19,7 +19,6 @@ const Combat = {
             
             this.weaponTargets.set(weapon.id, target);
             
-            // Handle weapon upgrades that modify attack
             let attackResults = [];
             
             if (weapon.doubleThrow && weapon.id === 'boomerang') {
@@ -53,7 +52,6 @@ const Combat = {
                 attackResults.push(weapon.attack(Player.entity.x, Player.entity.y, target.x, target.y));
             }
             
-            // Process results
             for (let result of attackResults) {
                 if (Array.isArray(result)) {
                     for (let proj of result) {
@@ -121,7 +119,6 @@ const Combat = {
                 continue;
             }
             
-            // Check hits on monsters
             for (let j = Monsters.active.length - 1; j >= 0; j--) {
                 const monster = Monsters.active[j];
                 const dist = Physics.distance(attack, monster);
@@ -136,27 +133,40 @@ const Combat = {
         }
     },
     
-    // Apply melee damage to monster
+    // Apply melee damage to monster (updated)
     applyMeleeDamage(attack, monster, index) {
         let dmg = attack.damage * Player.damageMultiplier * Game.difficultyMultipliers.playerDamage;
         
-        // Critical hit
-        if (Math.random() < Player.criticalChance) {
+        // Critical hit (only if damage > 0)
+        if (dmg > 0 && Math.random() < Player.criticalChance) {
             dmg *= 2;
             Effects.damageIndicator(monster.x, monster.y, Math.floor(dmg), true);
-        } else {
+        } else if (dmg > 0) {
             Effects.damageIndicator(monster.x, monster.y, Math.floor(dmg), false);
         }
         
         monster.health -= dmg;
         
-        // Life steal
-        if (Player.lifeSteal > 0) {
-            const healAmount = Math.floor(dmg * Player.lifeSteal);
-            if (healAmount > 0) Player.heal(healAmount);
+        // Life steal (if damage)
+        if (dmg > 0 && Player.lifeSteal > 0) {
+            const rawHeal = dmg * Player.lifeSteal;
+            Player.lifeStealRemainder += rawHeal;
+            if (Player.lifeStealRemainder >= 1) {
+                const healAmount = Math.floor(Player.lifeStealRemainder);
+                Player.heal(healAmount);
+                Player.lifeStealRemainder -= healAmount;
+            }
         }
         
-        // Knockback for axe
+        // Knockback from attack (used by weak trident)
+        if (attack.knockbackAmount) {
+            const kbAngle = Math.atan2(monster.y - attack.x, monster.x - attack.y);
+            monster.x += Math.cos(kbAngle) * attack.knockbackAmount;
+            monster.y += Math.sin(kbAngle) * attack.knockbackAmount;
+            Physics.clampToArena(monster);
+        }
+        
+        // Knockback from weapon upgrades (axe or player knockback)
         if (attack.weaponId === 'axe') {
             const kbForce = 8;
             const kbAngle = Math.atan2(monster.y - attack.x, monster.x - attack.y);
@@ -164,8 +174,6 @@ const Combat = {
             monster.y += Math.sin(kbAngle) * kbForce;
             Physics.clampToArena(monster);
         }
-        
-        // Knockback upgrade
         if (Player.knockback && attack.weaponId !== 'axe') {
             const kbForce = 6;
             const kbAngle = Math.atan2(monster.y - attack.x, monster.x - attack.y);
@@ -174,15 +182,21 @@ const Combat = {
             Physics.clampToArena(monster);
         }
         
-        // Status effects from weapon
+        // Status effects from attack (bleed from weak trident)
         const weaponRef = attack.weaponRef;
+        if (attack.bleedDamage && !monster.bleeding) {
+            monster.bleeding = true;
+            monster.bleedDmg = attack.bleedDamage;
+            monster.bleedEnd = Date.now() + (attack.bleedDuration || 3000);
+        }
+        // Fallback to weaponRef status effects (for upgraded weapons)
         if (weaponRef) {
             if (weaponRef.poisonDamage && !monster.poisoned) {
                 monster.poisoned = true;
                 monster.poisonDmg = weaponRef.poisonDamage;
                 monster.poisonEnd = Date.now() + (weaponRef.poisonDuration || 3000);
             }
-            if (weaponRef.bleedDamage && !monster.bleeding) {
+            if (weaponRef.bleedDamage && !monster.bleeding && !attack.bleedDamage) {  // avoid double bleed
                 monster.bleeding = true;
                 monster.bleedDmg = weaponRef.bleedDamage;
                 monster.bleedEnd = Date.now() + (weaponRef.bleedDuration || 4000);
@@ -208,7 +222,6 @@ const Combat = {
         for (let attack of Player.meleeAttacks) {
             MeleeWeapons.drawAttack(attack);
         }
-        // Also draw boss attacks
         Boss.drawAttacks();
     }
 };
