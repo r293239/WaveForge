@@ -5,7 +5,7 @@
 const Arena = {
     // How much to shift the arena left/up (pixels)
     shiftX: 38,   // 1 cm left (negative if you ever want right)
-    shiftY: 38,   // 1 cm up
+    shiftY: -57,  // 1.5 cm down (negative moves down, positive moves up)
 
     // Arena boundaries (calculated in init)
     bounds: {
