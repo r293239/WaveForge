@@ -3,9 +3,9 @@
 // ============================================
 
 const Arena = {
-    // How much to shift the arena left/up (pixels)
-    shiftX: 38,   // 1 cm left (negative if you ever want right)
-    shiftY: -57,  // 1.5 cm down (negative moves down, positive moves up)
+    // Shift values (set both to 0 to align with the CSS container border)
+    shiftX: 0,
+    shiftY: 0,
 
     // Arena boundaries (calculated in init)
     bounds: {
@@ -15,7 +15,7 @@ const Arena = {
         maxY: 0
     },
 
-    // Wall entities (for future obstacles)
+    // Wall entities
     walls: [],
 
     // Decorative elements
@@ -25,23 +25,17 @@ const Arena = {
         this.walls = [];
         this.decorations = [];
 
-        // Calculate actual paddings with shift, clamped to keep arena on canvas
-        const padLeft   = Math.max(0, CONFIG.ARENA.BOUNDARY_PADDING - this.shiftX);
-        const padTop    = Math.max(0, CONFIG.ARENA.BOUNDARY_PADDING - this.shiftY);
-        const padRight  = Math.max(0, CONFIG.ARENA.BOUNDARY_PADDING + this.shiftX);
-        const padBottom = Math.max(0, CONFIG.ARENA.BOUNDARY_PADDING + this.shiftY);
-
+        // Use the entire canvas area – no padding, no shift
         this.bounds = {
-            minX: padLeft,
-            minY: padTop,
-            maxX: CONFIG.CANVAS_WIDTH - padRight,
-            maxY: CONFIG.CANVAS_HEIGHT - padBottom
+            minX: 0,
+            minY: 0,
+            maxX: CONFIG.CANVAS_WIDTH,
+            maxY: CONFIG.CANVAS_HEIGHT
         };
 
         this.generateDecorations();
     },
 
-    // Generate random decorative elements
     generateDecorations() {
         for (let i = 0; i < 8; i++) {
             this.decorations.push({
@@ -53,12 +47,10 @@ const Arena = {
         }
     },
 
-    // Get arena boundaries
     getBounds() {
         return { ...this.bounds };
     },
 
-    // Get random spawn position outside a radius from center
     getRandomSpawnPosition(minDistFromCenter = 100, minDistFromPlayer = 150) {
         let x, y, valid = false;
         const centerX = CONFIG.CANVAS_WIDTH / 2;
@@ -101,7 +93,6 @@ const Arena = {
         return { x, y };
     },
 
-    // Get random position inside arena (not too close to edges)
     getRandomArenaPosition(margin = 50) {
         return {
             x: this.bounds.minX + margin + Math.random() * (this.bounds.maxX - this.bounds.minX - margin * 2),
@@ -109,7 +100,6 @@ const Arena = {
         };
     },
 
-    // Check if position is within arena bounds
     isInBounds(x, y, radius = 0) {
         return x - radius >= this.bounds.minX &&
                x + radius <= this.bounds.maxX &&
@@ -117,7 +107,6 @@ const Arena = {
                y + radius <= this.bounds.maxY;
     },
 
-    // Add a wall/obstacle (for future use)
     addWall(x, y, width, height) {
         const wall = {
             x, y, width, height,
@@ -130,7 +119,6 @@ const Arena = {
         return wall;
     },
 
-    // Remove all walls
     clearWalls() {
         for (let wall of this.walls) {
             Physics.unregister(wall);
@@ -138,21 +126,18 @@ const Arena = {
         this.walls = [];
     },
 
-    // Draw arena
     draw() {
         const ctx = Game.ctx;
-
-        // Use the actual (shifted) bounds
         const b = this.bounds;
 
-        // Draw arena boundary
+        // Draw arena boundary exactly at canvas edges
         ctx.strokeStyle = 'rgba(100, 100, 150, 0.5)';
         ctx.lineWidth = CONFIG.ARENA.WALL_THICKNESS;
         ctx.strokeRect(
-            b.minX - 5,
-            b.minY - 5,
-            b.maxX - b.minX + 10,
-            b.maxY - b.minY + 10
+            b.minX - 1,   // tiny offset to align perfectly with the container's 3px border
+            b.minY - 1,
+            b.maxX - b.minX + 2,
+            b.maxY - b.minY + 2
         );
 
         // Corner markers
@@ -188,7 +173,7 @@ const Arena = {
         ctx.lineTo(b.maxX - cornerSize, b.maxY);
         ctx.stroke();
 
-        // Decorative elements (unchanged, but they were placed within bounds anyway)
+        // Decorations
         for (let deco of this.decorations) {
             ctx.fillStyle = `rgba(100, 100, 150, ${deco.alpha})`;
             ctx.beginPath();
@@ -196,7 +181,7 @@ const Arena = {
             ctx.fill();
         }
 
-        // Walls (unchanged)
+        // Walls
         for (let wall of this.walls) {
             ctx.fillStyle = 'rgba(100, 100, 120, 0.5)';
             ctx.fillRect(wall.x - wall.width/2, wall.y - wall.height/2, wall.width, wall.height);
