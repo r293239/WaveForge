@@ -187,11 +187,15 @@ const WEAPON_DATA = [
     {
         id: 'spear', name: 'Trident', icon: '🔱', type: 'melee',
         meleeType: 'pierce', baseDamage: 10, attackSpeed: 1.0, range: 100,
-        cost: 110, description: 'Three-pronged thrust',
+        cost: 110, description: 'Throw to pierce. Weak bleed when thrown. Upgrades: Loyal/Channeling',
         swingColor: '#CD7F32', swingAngle: 45,
         trailColor: '#50C878', sparkleColor: '#FFD700',
         prongColor: '#CD7F32', shaftColor: '#8B4513', tipColor: '#FFD700',
-        usesAmmo: false, pierceCount: 3,
+        usesAmmo: true,            // <-- now uses ammo for the throw
+        magazineSize: 1,           // one throw
+        resetEachRound: true,      // ammo resets each wave
+        pierceCount: 3,
+        pickupRange: 80,           // larger pickup range
         tierMultipliers: {
             damage: [1, 1.3, 1.6, 2.0, 2.5, 3.0],
             attackSpeed: [1, 1.1, 1.2, 1.3, 1.4, 1.5],
