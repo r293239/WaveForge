@@ -110,12 +110,8 @@ const Upgrades = {
         }
     },
     
-    // Apply weapon upgrade
-    applyWeaponUpgrade(upgrade) {
-        Game.weaponUpgrades[upgrade.weaponId] = upgrade.id;
-        const weapon = Player.getWeaponById(upgrade.weaponId);
-        if (!weapon) return;
-        
+    // Silent version – applies upgrade effects to a weapon instance without UI message
+    applyWeaponUpgradeSilent(upgrade, weapon) {
         const e = upgrade.effect;
         if (e.poisonDamage) { weapon.poisonDamage = e.poisonDamage; weapon.poisonDuration = e.poisonDuration; }
         if (e.fireDamage) { weapon.fireDamage = e.fireDamage; weapon.fireDuration = e.fireDuration; }
@@ -123,6 +119,8 @@ const Upgrades = {
         if (e.attackSpeedMult) weapon.attackSpeed *= e.attackSpeedMult;
         if (e.critChance) Player.criticalChance += e.critChance;
         if (e.stunDuration) weapon.stunDuration = e.stunDuration;
+        
+        // Loyal Trident
         if (e.returningWeapon) {
             weapon.isThrowable = true;
             weapon.returnSpeed = 12;
@@ -131,12 +129,11 @@ const Upgrades = {
             weapon.currentAmmo = 1;
             weapon.resetEachRound = true;
         }
-        if (e.lightningStrike) {
-            weapon.lightningStrike = true;
-        }
-        if (e.removePierce) {
-            weapon.pierceCount = 1;   // remove piercing
-        }
+        
+        // Channeling Trident
+        if (e.lightningStrike) weapon.lightningStrike = true;
+        if (e.removePierce) weapon.pierceCount = 1;
+        
         if (e.pelletCount) weapon.pelletCount = e.pelletCount;
         if (e.spreadAngle) weapon.spreadAngle = e.spreadAngle;
         if (e.spreadMult) weapon.spreadAngle = Math.floor(weapon.spreadAngle * e.spreadMult);
@@ -148,7 +145,16 @@ const Upgrades = {
         if (e.bounceCount) { weapon.bounceCount = e.bounceCount; weapon.bounceRange = e.bounceRange; }
         if (e.explosiveShot) { weapon.explosiveShot = true; weapon.explosiveDamage = e.explosiveDamage; weapon.explosiveRadius = e.explosiveRadius; }
         if (e.tripleShot) weapon.tripleShot = true;
+    },
+    
+    // Apply weapon upgrade (with message)
+    applyWeaponUpgrade(upgrade) {
+        // Store the upgrade globally so future merges/new weapons can apply it
+        Game.weaponUpgrades[upgrade.weaponId] = upgrade.id;
+        const weapon = Player.getWeaponById(upgrade.weaponId);
+        if (!weapon) return;
         
+        this.applyWeaponUpgradeSilent(upgrade, weapon);
         Messages.show(`${upgrade.name} applied to ${weapon.name}!`);
     }
 };
