@@ -5,9 +5,7 @@
 const Shop = {
     items: [],
     
-    init() {
-        this.items = [];
-    },
+    init() { this.items = []; },
     
     generateItems() {
         this.items = [];
@@ -23,19 +21,15 @@ const Shop = {
                 const idx = Math.floor(Math.random() * availWeapons.length);
                 const weaponData = availWeapons[idx];
                 
-                // Tier restrictions
                 let tier = 1;
-                if (Game.wave >= 20 && Math.random() < 0.15) {
-                    tier = 3;
-                } else if (Game.wave >= 10 && Math.random() < 0.3) {
-                    tier = 2;
-                }
+                if (Game.wave >= 20 && Math.random() < 0.15) tier = 3;
+                else if (Game.wave >= 10 && Math.random() < 0.3) tier = 2;
                 
                 this.items.push({
                     type: 'weapon',
                     data: weaponData,
                     tier: tier,
-                    instance: new WeaponInstance(weaponData, tier)
+                    instance: WeaponBase.create(weaponData, tier)
                 });
                 availWeapons.splice(idx, 1);
             }
@@ -70,11 +64,9 @@ const Shop = {
             Messages.show(`Not enough gold! Need ${Game.refreshCost}g`);
             return;
         }
-        
         Game.gold -= Game.refreshCost;
         Game.refreshCount++;
         Game.refreshCost = CONFIG.SHOP_REFRESH_BASE_COST + Game.refreshCount * CONFIG.SHOP_REFRESH_COST_INCREMENT;
-        
         this.generateItems();
         Messages.show(`Shop refreshed! Cost increased to ${Game.refreshCost}g`);
         HUD.updateStats();
@@ -82,28 +74,22 @@ const Shop = {
     
     purchase(index) {
         if (index < 0 || index >= this.items.length || !this.items[index]) return;
-        
         const shopItem = this.items[index];
         const data = shopItem.data;
         let cost = data.cost;
-        
         if (shopItem.type === 'weapon') {
             cost = shopItem.instance.getShopCost();
         }
-        
         if (Game.gold < cost) {
             Messages.show(`Not enough gold! Need ${cost}, have ${Game.gold}`);
             return;
         }
         
         if (shopItem.type === 'weapon') {
-            // Check if this weapon can be auto-merged with an existing one
             const existingWeapon = Player.weapons.find(w => 
                 w.id === data.id && w.tier === (shopItem.tier || 1) && w.tier < 5
             );
-            
             if (existingWeapon) {
-                // Auto-merge regardless of slot availability
                 const mergeCost = existingWeapon.getMergeCost(shopItem.instance);
                 const totalCost = cost + mergeCost;
                 if (Game.gold < totalCost) {
@@ -119,13 +105,10 @@ const Shop = {
                 HUD.updateAll();
                 return;
             }
-            
-            // Normal purchase - check slot availability
             if (Player.weapons.length >= CONFIG.MAX_WEAPON_SLOTS) {
                 Messages.show('No empty weapon slots!');
                 return;
             }
-            
             Game.gold -= cost;
             Player.addWeapon(data, shopItem.tier || 1);
             Messages.show(`Purchased ${data.name} Tier ${shopItem.tier || 1}!`);
@@ -134,12 +117,29 @@ const Shop = {
             this.applyItemEffect(data);
             Messages.show(`Purchased ${data.name}!`);
         }
-        
         this.items[index] = null;
         HUD.updateAll();
     },
     
     applyItemEffect(item) {
+        // Handle consumable items (those with isConsumable flag)
+        if (item.isConsumable) {
+            const existing = Player.consumables.find(c => c.id === item.id);
+            if (existing) {
+                existing.count++;
+            } else {
+                Player.consumables.push({
+                    id: item.id,
+                    name: item.name,
+                    icon: item.icon,
+                    description: item.description,
+                    count: 1
+                });
+            }
+            return;
+        }
+        
+        // Other permanent items
         switch (item.id) {
             case 'damage_orb':
                 Player.damageMultiplier += 0.15;
@@ -243,14 +243,11 @@ const Shop = {
                 }
                 Messages.show(`Turret purchased! (${Towers.turrets.count}/${Towers.turrets.max})`);
                 break;
-            // Consumables handled by Player
         }
     },
     
     getCost(shopItem) {
-        if (shopItem.type === 'weapon') {
-            return shopItem.instance.getShopCost();
-        }
+        if (shopItem.type === 'weapon') return shopItem.instance.getShopCost();
         return shopItem.data.cost;
     }
 };
