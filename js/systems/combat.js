@@ -5,22 +5,15 @@
 const Combat = {
     weaponTargets: new Map(),
     
-    init() {
-        this.weaponTargets.clear();
-    },
+    init() { this.weaponTargets.clear(); },
     
-    // Update all weapons and find targets
     updateWeapons(currentTime) {
         for (let weapon of Player.weapons) {
             if (!weapon.canAttack(currentTime)) continue;
-            
             const target = this.findTarget(weapon);
             if (!target) continue;
-            
             this.weaponTargets.set(weapon.id, target);
-            
             let attackResults = [];
-            
             if (weapon.doubleThrow && weapon.id === 'boomerang') {
                 const angle = Math.atan2(target.y - Player.entity.y, target.x - Player.entity.x);
                 attackResults.push(weapon.attack(Player.entity.x, Player.entity.y, target.x, target.y));
@@ -51,7 +44,6 @@ const Combat = {
             } else {
                 attackResults.push(weapon.attack(Player.entity.x, Player.entity.y, target.x, target.y));
             }
-            
             for (let result of attackResults) {
                 if (Array.isArray(result)) {
                     for (let proj of result) {
@@ -70,13 +62,10 @@ const Combat = {
         }
     },
     
-    // Find best target for weapon
     findTarget(weapon) {
         let bestTarget = null;
         let bestValue = Infinity;
-        
         if (weapon.type === 'melee') {
-            // Closest monster within range
             for (let monster of Monsters.active) {
                 const dist = Physics.distance(Player.entity, monster);
                 if (dist < weapon.range + monster.radius && dist < bestValue) {
@@ -85,7 +74,6 @@ const Combat = {
                 }
             }
         } else if (weapon.sniper) {
-            // Highest HP monster within range
             let highestHp = -1;
             for (let monster of Monsters.active) {
                 const dist = Physics.distance(Player.entity, monster);
@@ -96,7 +84,6 @@ const Combat = {
                 }
             }
         } else {
-            // Closest monster within range
             for (let monster of Monsters.active) {
                 const dist = Physics.distance(Player.entity, monster);
                 if (dist < weapon.range && dist < bestValue) {
@@ -105,24 +92,19 @@ const Combat = {
                 }
             }
         }
-        
         return bestTarget;
     },
     
-    // Update melee attacks
     updateMeleeAttacks(currentTime) {
         for (let i = Player.meleeAttacks.length - 1; i >= 0; i--) {
             const attack = Player.meleeAttacks[i];
-            
             if (currentTime - attack.startTime > attack.duration) {
                 Player.meleeAttacks.splice(i, 1);
                 continue;
             }
-            
             for (let j = Monsters.active.length - 1; j >= 0; j--) {
                 const monster = Monsters.active[j];
                 const dist = Physics.distance(attack, monster);
-                
                 if (dist < attack.radius + monster.radius) {
                     if (!attack.attackedMonsters.has(monster)) {
                         attack.attackedMonsters.add(monster);
@@ -133,21 +115,17 @@ const Combat = {
         }
     },
     
-    // Apply melee damage to monster (updated)
     applyMeleeDamage(attack, monster, index) {
         let dmg = attack.damage * Player.damageMultiplier * Game.difficultyMultipliers.playerDamage;
-        
-        // Critical hit (only if damage > 0)
         if (dmg > 0 && Math.random() < Player.criticalChance) {
             dmg *= 2;
             Effects.damageIndicator(monster.x, monster.y, Math.floor(dmg), true);
         } else if (dmg > 0) {
             Effects.damageIndicator(monster.x, monster.y, Math.floor(dmg), false);
         }
-        
         monster.health -= dmg;
         
-        // Life steal (if damage)
+        // Lifesteal
         if (dmg > 0 && Player.lifeSteal > 0) {
             const rawHeal = dmg * Player.lifeSteal;
             Player.lifeStealRemainder += rawHeal;
@@ -158,7 +136,7 @@ const Combat = {
             }
         }
         
-        // Knockback from attack (used by weak trident)
+        // Knockback from attack (weak trident)
         if (attack.knockbackAmount) {
             const kbAngle = Math.atan2(monster.y - attack.x, monster.x - attack.y);
             monster.x += Math.cos(kbAngle) * attack.knockbackAmount;
@@ -166,7 +144,7 @@ const Combat = {
             Physics.clampToArena(monster);
         }
         
-        // Knockback from weapon upgrades (axe or player knockback)
+        // Weapon‑specific knockback
         if (attack.weaponId === 'axe') {
             const kbForce = 8;
             const kbAngle = Math.atan2(monster.y - attack.x, monster.x - attack.y);
@@ -182,21 +160,22 @@ const Combat = {
             Physics.clampToArena(monster);
         }
         
-        // Status effects from attack (bleed from weak trident)
-        const weaponRef = attack.weaponRef;
+        // Bleed from attack
         if (attack.bleedDamage && !monster.bleeding) {
             monster.bleeding = true;
             monster.bleedDmg = attack.bleedDamage;
             monster.bleedEnd = Date.now() + (attack.bleedDuration || 3000);
         }
-        // Fallback to weaponRef status effects (for upgraded weapons)
+        
+        // Weapon‑upgrade status effects
+        const weaponRef = attack.weaponRef;
         if (weaponRef) {
             if (weaponRef.poisonDamage && !monster.poisoned) {
                 monster.poisoned = true;
                 monster.poisonDmg = weaponRef.poisonDamage;
                 monster.poisonEnd = Date.now() + (weaponRef.poisonDuration || 3000);
             }
-            if (weaponRef.bleedDamage && !monster.bleeding && !attack.bleedDamage) {  // avoid double bleed
+            if (weaponRef.bleedDamage && !monster.bleeding && !attack.bleedDamage) {
                 monster.bleeding = true;
                 monster.bleedDmg = weaponRef.bleedDamage;
                 monster.bleedEnd = Date.now() + (weaponRef.bleedDuration || 4000);
@@ -211,13 +190,11 @@ const Combat = {
             }
         }
         
-        // Check death
         if (monster.health <= 0) {
             Monsters.handleDeath(monster, index);
         }
     },
     
-    // Draw all melee attacks
     drawMeleeAttacks() {
         for (let attack of Player.meleeAttacks) {
             MeleeWeapons.drawAttack(attack);
