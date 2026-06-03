@@ -55,23 +55,21 @@ const MeleeWeapons = {
                 return {
                     type: 'melee',
                     x: playerX, y: playerY,
-                    radius: 40,                        // slightly larger reach
-                    damage: 0,                         // NO instant damage
+                    radius: 40,
+                    damage: 0,
                     color: weapon.swingColor,
                     startTime: currentTime,
-                    duration: 250,                     // slightly longer
-                    swingAngle: 60,                    // wider arc
+                    duration: 250,
+                    swingAngle: 60,
                     meleeType: 'single',
                     angle: angle,
-                    pierceCount: 1,                    // can hit one enemy
+                    pierceCount: 1,
                     weaponId: weapon.id,
                     weaponRef: weapon,
                     attackedMonsters: new Set(),
-                    // Bleed effect (on the attack itself)
                     bleedDamage: 5,
                     bleedDuration: 3000,
-                    // Knockback
-                    knockbackAmount: 8   // pixels pushed away
+                    knockbackAmount: 8
                 };
             }
         }
@@ -97,7 +95,6 @@ const MeleeWeapons = {
     },
     
     drawAttack(attack) {
-        // ... unchanged draw functions ...
         const ctx = Game.ctx;
         const currentTime = Date.now();
         const progress = (currentTime - attack.startTime) / attack.duration;
@@ -124,11 +121,10 @@ const MeleeWeapons = {
     drawSword(ctx, attack, distance, progress, alpha) {
         const swingProgress = Math.sin(progress * Math.PI);
         const currentAngle = attack.angle - 0.5 + swingProgress * 1;
-};
         ctx.rotate(currentAngle);
         ctx.shadowColor = 'rgba(255,255,255,0.5)';
         ctx.shadowBlur = 10 * alpha;
-
+        
         ctx.save();
         ctx.translate(10, 0);
         const gradient = ctx.createLinearGradient(0, -5, attack.radius * 0.9, -5);
@@ -145,22 +141,22 @@ const MeleeWeapons = {
         ctx.closePath();
         ctx.fill();
         ctx.restore();
-
+        
         ctx.fillStyle = '#8B4513';
         ctx.fillRect(-5, -4, 15, 8);
         ctx.fillStyle = '#B87333';
         ctx.fillRect(-8, -8, 8, 16);
     },
-
+    
     drawBattleAxe(ctx, attack, distance, progress, alpha) {
         const spinAngle = progress * Math.PI * 4;
         ctx.rotate(spinAngle);
         ctx.shadowColor = 'rgba(139,69,19,0.5)';
         ctx.shadowBlur = 15 * alpha;
-
+        
         ctx.fillStyle = attack.handleColor || '#654321';
         ctx.fillRect(-3, -attack.radius * 0.8, 6, attack.radius * 1.6);
-
+        
         ctx.save();
         ctx.translate(0, -attack.radius * 0.4);
         ctx.rotate(-0.3);
@@ -177,7 +173,7 @@ const MeleeWeapons = {
         ctx.closePath();
         ctx.fill();
         ctx.restore();
-
+        
         if (progress > 0.3 && progress < 0.7) {
             ctx.save();
             ctx.rotate(0);
@@ -190,7 +186,7 @@ const MeleeWeapons = {
             ctx.restore();
         }
     },
-
+    
     drawDagger(ctx, attack, angle, distance, progress, alpha) {
         const stabProgress = Math.min(progress * 2, 1);
         const stabDistance = distance * 1.5;
@@ -198,7 +194,7 @@ const MeleeWeapons = {
         ctx.translate(stabDistance, 0);
         ctx.shadowColor = 'rgba(70,130,180,0.5)';
         ctx.shadowBlur = 10 * alpha;
-
+        
         const bladeGradient = ctx.createLinearGradient(0, -3, 40, -3);
         bladeGradient.addColorStop(0, '#4682B4');
         bladeGradient.addColorStop(1, '#87CEEB');
@@ -207,11 +203,11 @@ const MeleeWeapons = {
         ctx.moveTo(0, -3); ctx.lineTo(40, -1); ctx.lineTo(40, 1); ctx.lineTo(0, 3);
         ctx.closePath();
         ctx.fill();
-
+        
         ctx.fillStyle = '#2F4F4F';
         ctx.fillRect(-8, -4, 12, 8);
     },
-
+    
     drawHammer(ctx, attack, angle, distance, progress, alpha) {
         ctx.rotate(angle);
         const lift = Math.sin(progress * Math.PI) * 30;
@@ -219,10 +215,10 @@ const MeleeWeapons = {
         ctx.translate(20, -30 + lift - smashY);
         ctx.shadowColor = 'rgba(105,105,105,0.7)';
         ctx.shadowBlur = 20 * alpha;
-
+        
         ctx.fillStyle = '#8B4513';
         ctx.fillRect(-3, 0, 6, 50);
-
+        
         ctx.save();
         ctx.translate(0, -15);
         ctx.fillStyle = '#696969';
@@ -232,7 +228,7 @@ const MeleeWeapons = {
         ctx.fillRect(12, -15, 6, 20);
         ctx.restore();
     },
-
+    
     drawTrident(ctx, attack, angle, distance, progress, alpha) {
         const thrustProgress = Math.min(progress * 1.5, 1);
         const thrustDistance = distance * 1.3 * thrustProgress;
@@ -240,10 +236,10 @@ const MeleeWeapons = {
         ctx.translate(thrustDistance, 0);
         ctx.shadowColor = 'rgba(50,205,50,0.5)';
         ctx.shadowBlur = 15 * alpha;
-
+        
         ctx.fillStyle = '#8B4513';
         ctx.fillRect(-3, -3, attack.radius + 20, 6);
-
+        
         ctx.save();
         ctx.translate(attack.radius + 10, 0);
         ctx.fillStyle = '#CD7F32';
@@ -253,7 +249,7 @@ const MeleeWeapons = {
         ctx.fill();
         ctx.restore();
     },
-
+    
     drawDualDaggers(ctx, attack, angle, distance, progress, alpha) {
         ctx.save();
         ctx.rotate(angle - 0.2);
@@ -268,7 +264,7 @@ const MeleeWeapons = {
         ctx.fillStyle = attack.hiltColor || '#2F4F4F';
         ctx.fillRect(-5, -4, 8, 8);
         ctx.restore();
-
+        
         ctx.save();
         ctx.rotate(angle + 0.2);
         ctx.translate(distance * 0.8, 0);
@@ -283,7 +279,7 @@ const MeleeWeapons = {
         ctx.fillRect(-5, -4, 8, 8);
         ctx.restore();
     },
-
+    
     drawDefault(ctx, attack, distance, progress, alpha) {
         ctx.rotate(attack.angle);
         ctx.translate(distance, 0);
@@ -294,6 +290,4 @@ const MeleeWeapons = {
         ctx.arc(0, 0, 10, 0, Math.PI * 2);
         ctx.fill();
     }
-};
-
 };
