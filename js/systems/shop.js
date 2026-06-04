@@ -103,6 +103,7 @@ const Shop = {
                 Messages.show(`Auto-merged to ${merged.getDisplayName()}!`);
                 this.items[index] = null;
                 HUD.updateAll();
+                HUD.updateConsumables();
                 return;
             }
             if (Player.weapons.length >= CONFIG.MAX_WEAPON_SLOTS) {
@@ -119,11 +120,12 @@ const Shop = {
         }
         this.items[index] = null;
         HUD.updateAll();
+        HUD.updateConsumables();
     },
     
     applyItemEffect(item) {
-        // Handle consumable items (those with isConsumable flag)
-        if (item.isConsumable) {
+        // --- CONSUMABLE ITEMS (check by type) ---
+        if (item.type === 'consumable') {
             const existing = Player.consumables.find(c => c.id === item.id);
             if (existing) {
                 existing.count++;
@@ -136,10 +138,11 @@ const Shop = {
                     count: 1
                 });
             }
+            HUD.updateConsumables();
             return;
         }
         
-        // Other permanent items
+        // Permanent items
         switch (item.id) {
             case 'damage_orb':
                 Player.damageMultiplier += 0.15;
