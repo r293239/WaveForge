@@ -55,6 +55,7 @@ const Game = {
         if (this.sandboxMode && this.wave === 40) Messages.show('Sandbox Mode Active!', 4000);
         this.state = GAME_STATE.STAT_SELECT; this.waveActive = false;
         this.gold += Math.floor(Waves.getWaveConfig(this.wave).goldReward * (1 + Player.goldMultiplier));
+        Save.saveGame();  // Auto-save at wave completion
         Player.weapons.forEach(w => { if (w.usesAmmo && !w.isThrowable) { w.currentAmmo = w.magazineSize; w.isReloading = false; } });
         Upgrades.showSelection(); HUD.updateAll();
     },
