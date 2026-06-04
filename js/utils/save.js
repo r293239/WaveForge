@@ -1,45 +1,34 @@
 // ============================================
-// WAVEFORGE - Save/Load System
+// WAVEFORGE - Save System
 // ============================================
 
 const Save = {
-    key: 'waveforge_save',
-    
-    init() {},
-    
-    hasSave() {
-        return localStorage.getItem(this.key) !== null;
-    },
-    
+    STORAGE_KEY: 'waveforge_save',
+
+    // Serialise current game to a compact object and store
     saveGame() {
-        if (Game.state === GAME_STATE.START || Game.state === GAME_STATE.GAMEOVER) return;
-        
         const data = {
+            version: 1,
+            difficulty: Game.difficulty,
             wave: Game.wave,
             gold: Game.gold,
             kills: Game.kills,
-            state: Game.state,
-            waveActive: Game.waveActive,
             refreshCount: Game.refreshCount,
             refreshCost: Game.refreshCost,
-            difficulty: Game.difficulty,
             sandboxMode: Game.sandboxMode,
             gameWon: Game.gameWon,
-            purchasedItems: Game.purchasedItems,
-            weaponUpgrades: Game.weaponUpgrades,
-            
+
+            // Player stats
             player: {
-                x: Player.entity?.x,
-                y: Player.entity?.y,
                 health: Player.health,
                 maxHealth: Player.maxHealth,
                 damageMultiplier: Player.damageMultiplier,
-                speed: Player.speed,
-                baseSpeed: Player.baseSpeed,
                 speedMultiplier: Player.speedMultiplier,
                 lifeSteal: Player.lifeSteal,
+                lifeStealRemainder: Player.lifeStealRemainder || 0,
                 criticalChance: Player.criticalChance,
                 goldMultiplier: Player.goldMultiplier,
+                healthRegen: Player.healthRegen,
                 healthRegenPercent: Player.healthRegenPercent,
                 damageReduction: Player.damageReduction,
                 dodgeChance: Player.dodgeChance,
@@ -47,204 +36,249 @@ const Save = {
                 attackSpeedMultiplier: Player.attackSpeedMultiplier,
                 reloadSpeedMultiplier: Player.reloadSpeedMultiplier,
                 firstHitReduction: Player.firstHitReduction,
+                firstHitActive: Player.firstHitActive,
                 guardianAngel: Player.guardianAngel,
                 guardianAngelUsed: Player.guardianAngelUsed,
                 bloodContract: Player.bloodContract,
                 bloodContractStacks: Player.bloodContractStacks,
                 berserkerRing: Player.berserkerRing,
-                consumables: Player.consumables
+                knockback: Player.knockback,
+                explosiveKills: Player.explosiveKills,
+                goldMagnet: Player.goldMagnet,
+                facingAngle: Player.facingAngle,
+                lastFacingAngle: Player.lastFacingAngle
             },
-            
-            towers: {
-                landmines: {
-                    count: Towers.landmines.count,
-                    active: Towers.landmines.active.map(m => ({ x: m.x, y: m.y }))
-                },
-                healingTowers: {
-                    count: Towers.healingTowers.count,
-                    active: Towers.healingTowers.active.map(t => ({ x: t.x, y: t.y, health: t.health }))
-                },
-                turrets: {
-                    count: Towers.turrets.count,
-                    active: Towers.turrets.active.map(t => ({ x: t.x, y: t.y, health: t.health }))
-                }
-            },
-            
+
+            // Weapons – store id, tier, ammo, throw state, and upgrade flags
             weapons: Player.weapons.map(w => ({
-                id: w.id, tier: w.tier,
-                currentAmmo: w.currentAmmo,
-                isReloading: w.isReloading
+                id: w.id,
+                tier: w.tier,
+                currentAmmo: w.usesAmmo ? w.currentAmmo : undefined,
+                isReloading: w.usesAmmo ? w.isReloading : undefined,
+                isThrown: w.id === 'spear' ? w.isThrown : undefined,
+                thrownX: w.id === 'spear' ? w.thrownX : undefined,
+                thrownY: w.id === 'spear' ? w.thrownY : undefined,
+                // Persist upgrade flags that are on the weapon
+                poisonDamage: w.poisonDamage,
+                poisonDuration: w.poisonDuration,
+                fireDamage: w.fireDamage,
+                fireDuration: w.fireDuration,
+                bleedDamage: w.bleedDamage,
+                bleedDuration: w.bleedDuration,
+                stunDuration: w.stunDuration,
+                doubleThrow: w.doubleThrow,
+                orbitalMode: w.orbitalMode,
+                tripleShot: w.tripleShot,
+                explosiveShot: w.explosiveShot,
+                explosiveDamage: w.explosiveDamage,
+                explosiveRadius: w.explosiveRadius,
+                forkLaser: w.forkLaser,
+                lightningStrike: w.lightningStrike,
+                returnSpeed: w.returnSpeed,
+                pierceCount: w.pierceCount,
+                pelletCount: w.pelletCount,
+                spreadAngle: w.spreadAngle,
+                bounceCount: w.bounceCount,
+                bounceRange: w.bounceRange,
+                maxTargets: w.maxTargets,
+                // baseDamage and attackSpeed are derived from tier and multipliers, but we'll reapply tier bonuses on load
             })),
-            
-            shopItems: Shop.items.map(item => item ? {
-                type: item.type,
-                dataId: item.data?.id,
-                tier: item.tier
-            } : null),
-            
-            timestamp: Date.now()
+
+            // Consumables
+            consumables: Player.consumables.map(c => ({
+                id: c.id,
+                count: c.count
+            })),
+
+            // Abilities – store type and cooldown remaining
+            abilities: Abilities.abilities ? Abilities.abilities.map(a => ({
+                id: a.id,
+                cooldownRemaining: a.cooldownRemaining || 0,
+                active: a.active || false
+            })) : [],
+
+            // Towers
+            towers: {
+                landmines: Towers.landmines.count,
+                healingTowers: Towers.healingTowers.count,
+                turrets: Towers.turrets.count
+            },
+
+            // Purchased items & weapon upgrades
+            purchasedItems: { ...Game.purchasedItems },
+            weaponUpgrades: { ...Game.weaponUpgrades }
         };
-        
+
         try {
-            localStorage.setItem(this.key, JSON.stringify(data));
-        } catch(e) {
-            console.log('Save failed:', e.message);
-        }
-    },
-    
-    loadGame() {
-        const saved = localStorage.getItem(this.key);
-        if (!saved) {
-            Messages.show('No saved game found!');
-            return false;
-        }
-        
-        try {
-            const data = JSON.parse(saved);
-            
-            Game.wave = data.wave;
-            Game.gold = data.gold;
-            Game.kills = data.kills;
-            Game.state = data.state;
-            Game.waveActive = data.waveActive;
-            Game.refreshCount = data.refreshCount || 0;
-            Game.refreshCost = data.refreshCost || 5;
-            Game.difficulty = data.difficulty || 'normal';
-            Game.sandboxMode = data.sandboxMode || false;
-            Game.gameWon = data.gameWon || false;
-            Game.purchasedItems = data.purchasedItems || {};
-            Game.weaponUpgrades = data.weaponUpgrades || {};
-            Game.setDifficulty(Game.difficulty);
-            
-            // Restore player
-            if (data.player) {
-                Player.health = data.player.health;
-                Player.maxHealth = data.player.maxHealth;
-                Player.damageMultiplier = data.player.damageMultiplier;
-                Player.speed = data.player.speed;
-                Player.baseSpeed = data.player.baseSpeed;
-                Player.speedMultiplier = data.player.speedMultiplier;
-                Player.lifeSteal = data.player.lifeSteal;
-                Player.criticalChance = data.player.criticalChance;
-                Player.goldMultiplier = data.player.goldMultiplier;
-                Player.healthRegenPercent = data.player.healthRegenPercent;
-                Player.damageReduction = data.player.damageReduction;
-                Player.dodgeChance = data.player.dodgeChance;
-                Player.thornsDamage = data.player.thornsDamage;
-                Player.attackSpeedMultiplier = data.player.attackSpeedMultiplier;
-                Player.reloadSpeedMultiplier = data.player.reloadSpeedMultiplier;
-                Player.firstHitReduction = data.player.firstHitReduction;
-                Player.guardianAngel = data.player.guardianAngel;
-                Player.guardianAngelUsed = data.player.guardianAngelUsed;
-                Player.bloodContract = data.player.bloodContract;
-                Player.bloodContractStacks = data.player.bloodContractStacks;
-                Player.berserkerRing = data.player.berserkerRing;
-                Player.consumables = data.player.consumables || [];
-                
-                if (data.player.x && data.player.y) {
-                    Player.entity = {
-                        x: data.player.x,
-                        y: data.player.y,
-                        radius: CONFIG.PLAYER_START.radius,
-                        hitboxRadius: CONFIG.PLAYER_START.radius * CONFIG.HITBOX.PLAYER,
-                        color: '#ff6b6b',
-                        isPlayer: true
-                    };
-                }
-            }
-            
-            // Restore towers
-            if (data.towers) {
-                if (data.towers.landmines) {
-                    Towers.landmines.count = data.towers.landmines.count || 0;
-                    Towers.landmines.active = (data.towers.landmines.active || []).map(m => ({
-                        ...m, radius: 15, damage: 80, explosionRadius: 60, active: true, startTime: Date.now(), color: '#8B4513'
-                    }));
-                }
-                if (data.towers.healingTowers) {
-                    Towers.healingTowers.count = data.towers.healingTowers.count || 0;
-                    Towers.healingTowers.active = (data.towers.healingTowers.active || []).map(t => ({
-                        ...t, radius: 20, healAmount: 1, lastHeal: Date.now()
-                    }));
-                }
-                if (data.towers.turrets) {
-                    Towers.turrets.count = data.towers.turrets.count || 0;
-                    Towers.turrets.active = (data.towers.turrets.active || []).map(t => ({
-                        ...t, radius: 20, damage: 7, range: 300, attackSpeed: 1.0,
-                        projectileColor: '#FFD700', projectileSpeed: 10, lastAttack: 0
-                    }));
-                }
-            }
-            
-            // Restore weapons
-            Player.weapons = [];
-            if (data.weapons) {
-                for (let w of data.weapons) {
-                    const weaponData = WEAPON_DATA.find(wp => wp.id === w.id);
-                    if (weaponData) {
-                        const weapon = new WeaponInstance(weaponData, w.tier);
-                        if (weapon.usesAmmo) {
-                            weapon.currentAmmo = w.currentAmmo;
-                            weapon.isReloading = w.isReloading;
-                        }
-                        Player.weapons.push(weapon);
-                    }
-                }
-            }
-            
-            // Restore shop
-            Shop.items = [];
-            if (data.shopItems) {
-                for (let item of data.shopItems) {
-                    if (!item) { Shop.items.push(null); continue; }
-                    if (item.type === 'weapon') {
-                        const weaponData = WEAPON_DATA.find(w => w.id === item.dataId);
-                        if (weaponData) {
-                            Shop.items.push({
-                                type: 'weapon',
-                                data: weaponData,
-                                tier: item.tier || 1,
-                                instance: new WeaponInstance(weaponData, item.tier || 1)
-                            });
-                        }
-                    } else {
-                        const itemData = ITEM_DATA.find(it => it.id === item.dataId);
-                        if (itemData) {
-                            Shop.items.push({ type: 'item', data: itemData });
-                        }
-                    }
-                }
-            }
-            
-            // Restart blood contract if needed
-            if (Player.bloodContract && !Player.bloodContractInterval) {
-                Player.bloodContractInterval = setInterval(() => {
-                    if (Game.state === GAME_STATE.WAVE) {
-                        const dmg = Math.max(1, Math.floor(Player.maxHealth * 0.01 * Player.bloodContractStacks));
-                        if (Player.health > dmg) Player.takeDamage(dmg);
-                    }
-                }, 1000);
-            }
-            
-            // Start wave if needed
-            if (Game.state === GAME_STATE.WAVE) {
-                Game.waveActive = true;
-                Waves.startWave();
-            } else if (Game.state === GAME_STATE.SHOP || Game.state === GAME_STATE.WIN) {
-                HUD.showWaveButton();
-                HUD.updateAll();
-            }
-            
-            Messages.show('Game loaded!');
-            return true;
+            localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data));
         } catch (e) {
-            console.error('Load failed:', e);
-            Messages.show('Failed to load save file!');
-            return false;
+            console.warn('Could not save game:', e);
         }
     },
-    
+
+    // Load game from storage and resume
+    loadGame() {
+        const raw = localStorage.getItem(this.STORAGE_KEY);
+        if (!raw) {
+            Messages.show('No save found!');
+            return false;
+        }
+
+        let data;
+        try {
+            data = JSON.parse(raw);
+        } catch (e) {
+            Messages.show('Save corrupted!');
+            this.clearSave();
+            return false;
+        }
+
+        // Reset everything to a clean state first
+        Player.reset();
+        Monsters.reset();
+        Boss.reset();
+        Projectiles.reset();
+        Towers.reset();
+        Effects.reset();
+        Abilities.reset();
+
+        // Restore game state
+        Game.difficulty = data.difficulty;
+        Game.setDifficulty(data.difficulty);  // reapply multipliers
+        Game.wave = data.wave;
+        Game.gold = data.gold;
+        Game.kills = data.kills;
+        Game.refreshCount = data.refreshCount;
+        Game.refreshCost = data.refreshCost;
+        Game.sandboxMode = data.sandboxMode;
+        Game.gameWon = data.gameWon;
+        Game.purchasedItems = data.purchasedItems || {};
+        Game.weaponUpgrades = data.weaponUpgrades || {};
+
+        // Restore player stats
+        const p = data.player;
+        Player.health = p.health;
+        Player.maxHealth = p.maxHealth;
+        Player.damageMultiplier = p.damageMultiplier;
+        Player.speedMultiplier = p.speedMultiplier;
+        Player.speed = Player.baseSpeed * Player.speedMultiplier;
+        Player.lifeSteal = p.lifeSteal;
+        Player.lifeStealRemainder = p.lifeStealRemainder || 0;
+        Player.criticalChance = p.criticalChance;
+        Player.goldMultiplier = p.goldMultiplier;
+        Player.healthRegen = p.healthRegen;
+        Player.healthRegenPercent = p.healthRegenPercent;
+        Player.damageReduction = p.damageReduction;
+        Player.dodgeChance = p.dodgeChance;
+        Player.thornsDamage = p.thornsDamage;
+        Player.attackSpeedMultiplier = p.attackSpeedMultiplier;
+        Player.reloadSpeedMultiplier = p.reloadSpeedMultiplier;
+        Player.firstHitReduction = p.firstHitReduction;
+        Player.firstHitActive = p.firstHitActive;
+        Player.guardianAngel = p.guardianAngel;
+        Player.guardianAngelUsed = p.guardianAngelUsed;
+        Player.bloodContract = p.bloodContract;
+        Player.bloodContractStacks = p.bloodContractStacks;
+        Player.berserkerRing = p.berserkerRing;
+        Player.knockback = p.knockback;
+        Player.explosiveKills = p.explosiveKills;
+        Player.goldMagnet = p.goldMagnet;
+        Player.facingAngle = p.facingAngle;
+        Player.lastFacingAngle = p.lastFacingAngle;
+
+        // Restart blood contract interval if needed
+        if (Player.bloodContract) {
+            if (Player.bloodContractInterval) clearInterval(Player.bloodContractInterval);
+            Player.bloodContractInterval = setInterval(() => {
+                if (Game.state === GAME_STATE.WAVE) {
+                    const dmg = Math.max(1, Math.floor(Player.maxHealth * 0.01 * Player.bloodContractStacks));
+                    if (Player.health > dmg) Player.takeDamage(dmg);
+                }
+            }, 1000);
+        }
+
+        // Restore weapons
+        Player.weapons = [];
+        for (let wData of data.weapons) {
+            const base = WEAPON_DATA.find(w => w.id === wData.id);
+            if (!base) continue;
+            const weapon = WeaponBase.create(base, wData.tier);
+            // Restore ammo/throw state
+            if (weapon.usesAmmo) {
+                weapon.currentAmmo = wData.currentAmmo ?? weapon.magazineSize;
+                weapon.isReloading = wData.isReloading || false;
+            }
+            if (wData.id === 'spear') {
+                weapon.isThrown = wData.isThrown || false;
+                weapon.thrownX = wData.thrownX || 0;
+                weapon.thrownY = wData.thrownY || 0;
+            }
+            // Restore upgrade flags
+            weapon.poisonDamage = wData.poisonDamage;
+            weapon.poisonDuration = wData.poisonDuration;
+            weapon.fireDamage = wData.fireDamage;
+            weapon.fireDuration = wData.fireDuration;
+            weapon.bleedDamage = wData.bleedDamage;
+            weapon.bleedDuration = wData.bleedDuration;
+            weapon.stunDuration = wData.stunDuration;
+            weapon.doubleThrow = wData.doubleThrow;
+            weapon.orbitalMode = wData.orbitalMode;
+            weapon.tripleShot = wData.tripleShot;
+            weapon.explosiveShot = wData.explosiveShot;
+            weapon.explosiveDamage = wData.explosiveDamage;
+            weapon.explosiveRadius = wData.explosiveRadius;
+            weapon.forkLaser = wData.forkLaser;
+            weapon.lightningStrike = wData.lightningStrike;
+            weapon.returnSpeed = wData.returnSpeed;
+            weapon.pierceCount = wData.pierceCount;
+            weapon.pelletCount = wData.pelletCount;
+            weapon.spreadAngle = wData.spreadAngle;
+            weapon.bounceCount = wData.bounceCount;
+            weapon.bounceRange = wData.bounceRange;
+            weapon.maxTargets = wData.maxTargets;
+
+            Player.weapons.push(weapon);
+        }
+
+        // Restore consumables
+        Player.consumables = data.consumables.map(c => ({
+            id: c.id,
+            name: (ITEM_DATA.find(i => i.id === c.id) || {}).name || c.id,
+            icon: (ITEM_DATA.find(i => i.id === c.id) || {}).icon || '❓',
+            description: (ITEM_DATA.find(i => i.id === c.id) || {}).description || '',
+            count: c.count
+        }));
+
+        // Restore abilities
+        Abilities.reset();
+        for (let aData of data.abilities) {
+            const ability = Abilities.abilities.find(a => a.id === aData.id);
+            if (ability) {
+                ability.cooldownRemaining = aData.cooldownRemaining;
+                ability.active = aData.active;
+            } else {
+                Abilities.addAbility(aData.id);  // re-add if missing
+            }
+        }
+
+        // Restore tower counts
+        Towers.landmines.count = data.towers.landmines;
+        Towers.healingTowers.count = data.towers.healingTowers;
+        Towers.turrets.count = data.towers.turrets;
+
+        // Setup game state for next wave
+        Game.state = GAME_STATE.SHOP;
+        Game.waveActive = false;
+        Shop.generateItems();
+        HUD.updateAll();
+        HUD.updateConsumables();
+        Overlays.hideAll();
+        Messages.show('Game loaded!');
+        return true;
+    },
+
+    // Clear saved data
     clearSave() {
-        localStorage.removeItem(this.key);
+        localStorage.removeItem(this.STORAGE_KEY);
     }
 };
