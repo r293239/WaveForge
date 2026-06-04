@@ -36,7 +36,7 @@ const STAT_BUFFS = [
     { id: 'damage_boost', name: 'Damage Boost', description: 'Increase damage by 10%', icon: '⚔️', effect: { damagePercent: 0.1 } },
     { id: 'speed_boost', name: 'Speed Boost', description: 'Increase speed by 10%', icon: '👟', effect: { speedPercent: 0.1 } },
     { id: 'life_steal', name: 'Life Steal', description: 'Heal for 1% of damage dealt', icon: '🦇', effect: { lifeSteal: 0.01 } },
-    { id: 'critical_chance', name: 'Critical Strike', description: '5% chance for double damage', icon: '🎯', effect: { criticalChance: 0.05 } },
+    { id: 'critical_chance', name: 'Lucky Charm', description: '+5% critical hit chance', icon: '🍀', effect: { criticalChance: 0.05 } },
     { id: 'gold_bonus', name: 'Gold Bonus', description: 'Earn 10% more gold', icon: '💰', effect: { goldMultiplier: 0.1 } },
     { id: 'regen', name: 'Health Regen', description: 'Regenerate 1% HP per second', icon: '🔄', effect: { healthRegenPercent: 0.01 } },
     { id: 'armor', name: 'Armor', description: 'Reduce damage taken by 3%', icon: '🛡️', effect: { damageReduction: 0.03 } },
