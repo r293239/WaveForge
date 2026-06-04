@@ -159,6 +159,8 @@ const Waves = {
         
         // Deploy all towers (landmines, healing towers, turrets) – fresh start each wave
         Towers.deployAll();
+
+        Save.saveGame();  // Auto-save at the start of a wave
         
         HUD.updateStats();
         document.getElementById('monsterCount').textContent = `Monsters: ${Game.pendingSpawns}`;
