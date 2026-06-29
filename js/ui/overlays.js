@@ -61,18 +61,23 @@ const Overlays = {
             difficultySelect.style.display = 'flex';
         });
         
-        // Continue game button
+        // Continue game button - only show if save exists
+        const continueBtn = document.getElementById('continueGameBtn');
         if (Save.hasSave()) {
-            const continueBtn = document.createElement('button');
-            continueBtn.id = 'continueGameBtn';
-            continueBtn.textContent = 'Continue Game';
-            continueBtn.style.cssText = 'margin-top:10px;padding:10px 30px;background:linear-gradient(45deg,#4CAF50,#45a049);color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:1.2rem;font-weight:bold;';
+            continueBtn.style.display = 'block';
             continueBtn.addEventListener('click', () => {
                 if (Save.loadGame()) {
                     document.getElementById('startScreen').style.display = 'none';
                 }
             });
-            document.getElementById('startScreen').querySelector('.overlay-content').appendChild(continueBtn);
+            continueBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if (Save.loadGame()) {
+                    document.getElementById('startScreen').style.display = 'none';
+                }
+            });
+        } else {
+            continueBtn.style.display = 'none';
         }
     },
     
