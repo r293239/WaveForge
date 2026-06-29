@@ -9,6 +9,10 @@ const Save = {
         // Nothing needed for initialization
     },
 
+    hasSave() {
+        return localStorage.getItem(this.STORAGE_KEY) !== null;
+    },
+
     saveGame() {
         const data = {
             version: 1,
