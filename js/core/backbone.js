@@ -36,33 +36,81 @@ const Game = {
         
         try {
             // Initialize systems in correct order
+            console.log('Initializing Physics...');
             Physics.init(); 
+            
+            console.log('Initializing Arena...');
             Arena.init(); 
+            
+            console.log('Initializing Player...');
             Player.init(); 
+            
+            console.log('Initializing Monsters...');
             Monsters.init(); 
+            
+            console.log('Initializing MonsterBrain...');
             MonsterBrain.init();
+            
+            console.log('Initializing Boss...');
             Boss.init(); 
+            
+            console.log('Initializing Combat...');
             Combat.init(); 
+            
+            console.log('Initializing Projectiles...');
             Projectiles.init(); 
+            
+            console.log('Initializing Effects...');
             Effects.init(); 
+            
+            console.log('Initializing Towers...');
             Towers.init();
+            
+            console.log('Initializing Shop...');
             Shop.init(); 
+            
+            console.log('Initializing Waves...');
             Waves.init(); 
+            
+            console.log('Initializing Upgrades...');
             Upgrades.init(); 
+            
+            console.log('Initializing Abilities...');
             Abilities.init(); 
+            
+            console.log('Initializing Messages...');
             Messages.init();
+            
+            console.log('Initializing HUD...');
             HUD.init(); 
+            
+            console.log('Initializing StatsPanel...');
             StatsPanel.init(); 
+            
+            console.log('Initializing Overlays...');
             Overlays.init(); 
+            
+            console.log('Initializing Joystick...');
             Joystick.init(); 
+            
+            console.log('Initializing Save...');
             Save.init();
+            
+            console.log('All systems initialized successfully');
             
             this.setupKeyboard(); 
             Overlays.showStart(); 
             this.gameLoop();
         } catch (e) {
-            console.error('Game initialization error:', e);
-            Messages.show('Error starting game! Check console for details.');
+            console.error('Game initialization error details:');
+            console.error('Error name:', e.name);
+            console.error('Error message:', e.message);
+            console.error('Error stack:', e.stack);
+            // Try to show error in the UI
+            const errorMsg = document.createElement('div');
+            errorMsg.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#ff0000;color:#fff;padding:20px;border-radius:10px;z-index:9999;max-width:500px;text-align:center;font-size:16px;';
+            errorMsg.innerHTML = `<h2>Error Starting Game</h2><p>${e.message || 'Unknown error'}</p><p style="font-size:12px;color:#ffcccc;">Check console for details</p>`;
+            document.body.appendChild(errorMsg);
         }
     },
     
