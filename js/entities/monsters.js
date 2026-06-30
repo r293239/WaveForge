@@ -5,9 +5,27 @@
 const Monsters = {
     active: [],
     spawnIndicators: [],
+    spawnClusters: [],
+    clusterSpawnTimer: 0,
+    currentClusterIndex: 0,
+    monstersPerCluster: 3,
+    clusterSpawnDelay: 500, // ms between cluster spawns
     
-    init() { this.active = []; this.spawnIndicators = []; },
-    reset() { this.active = []; this.spawnIndicators = []; },
+    init() { 
+        this.active = []; 
+        this.spawnIndicators = []; 
+        this.spawnClusters = [];
+        this.clusterSpawnTimer = 0;
+        this.currentClusterIndex = 0;
+    },
+    
+    reset() { 
+        this.active = []; 
+        this.spawnIndicators = []; 
+        this.spawnClusters = [];
+        this.clusterSpawnTimer = 0;
+        this.currentClusterIndex = 0;
+    },
     
     getAttackRange(typeKey, radius) {
         switch (typeKey) {
@@ -62,44 +80,145 @@ const Monsters = {
             stunned: false, stunnedUntil: 0, poisoned: false, poisonDmg: 0, poisonEnd: 0,
             bleeding: false, bleedDmg: 0, bleedEnd: 0,
             lastPoisonTick: 0, lastBleedTick: 0, lastFireTick: 0,
-            targetX: x, targetY: y, flockId: null, role: null
+            targetX: x, targetY: y, flockId: null, role: null,
+            spawnClusterId: null
         };
         Effects.spawnEffect(x, y, type.color);
         this.active.push(monster);
         return monster;
     },
     
-    spawnWave(waveConfig, isBossWave) {
+    // Generate spawn clusters
+    generateSpawnClusters(waveConfig, isBossWave) {
+        this.spawnClusters = [];
+        this.currentClusterIndex = 0;
+        
         const countMultiplier = Game.difficultyMultipliers.monsterCountMultiplier || 1;
         const totalMonsters = Math.max(1, Math.floor(waveConfig.monsters * countMultiplier));
         
         const monsterTypes = isBossWave ? Waves.getNonBossTypesForWave(Game.wave) : Waves.getMonsterTypesForWave(Game.wave);
-        const tasks = [];
-        for (let i = 0; i < totalMonsters; i++) {
-            const typeKey = monsterTypes[i % monsterTypes.length];
-            const pos = Arena.getRandomSpawnPosition();
-            const delay = Math.random() * 3000;
-            tasks.push({ typeKey, x: pos.x, y: pos.y, delay });
+        
+        // Determine number of clusters (2-5 clusters based on wave)
+        const numClusters = Math.min(5, Math.max(2, Math.floor(totalMonsters / this.monstersPerCluster)));
+        const monstersPerCluster = Math.ceil(totalMonsters / numClusters);
+        
+        // Generate cluster positions (mix of edge and center positions)
+        const clusterPositions = [];
+        for (let i = 0; i < numClusters; i++) {
+            // 40% chance for center spawn, 60% for edge spawn
+            let pos;
+            if (Math.random() < 0.4) {
+                // Center spawn (within 100-300 pixels from center)
+                const angle = Math.random() * Math.PI * 2;
+                const distance = 100 + Math.random() * 200;
+                pos = {
+                    x: CONFIG.CANVAS_WIDTH / 2 + Math.cos(angle) * distance,
+                    y: CONFIG.CANVAS_HEIGHT / 2 + Math.sin(angle) * distance
+                };
+            } else {
+                // Edge spawn (on the arena boundary)
+                pos = Arena.getRandomSpawnPosition();
+            }
+            
+            // Ensure position is within bounds
+            pos.x = Math.max(50, Math.min(CONFIG.CANVAS_WIDTH - 50, pos.x));
+            pos.y = Math.max(50, Math.min(CONFIG.CANVAS_HEIGHT - 50, pos.y));
+            clusterPositions.push(pos);
         }
-        tasks.sort((a, b) => a.delay - b.delay);
-        tasks.forEach(task => {
-            Game.pendingSpawns++;
-            setTimeout(() => {
-                if (Game.state !== GAME_STATE.WAVE) { Game.pendingSpawns--; return; }
-                const indicator = { x: task.x, y: task.y, timer: 1000, startTime: Date.now(), isBoss: false };
-                this.spawnIndicators.push(indicator);
+        
+        // Assign monsters to clusters
+        let monsterIndex = 0;
+        for (let i = 0; i < numClusters; i++) {
+            const cluster = {
+                position: clusterPositions[i],
+                monsters: [],
+                spawnDelay: i * this.clusterSpawnDelay + Math.random() * 500,
+                spawned: false,
+                spawnStartTime: 0
+            };
+            
+            // Assign monsters to this cluster
+            const count = i === numClusters - 1 ? 
+                totalMonsters - monsterIndex : 
+                Math.min(monstersPerCluster, totalMonsters - monsterIndex);
+            
+            for (let j = 0; j < count && monsterIndex < totalMonsters; j++) {
+                const typeKey = monsterTypes[monsterIndex % monsterTypes.length];
+                cluster.monsters.push(typeKey);
+                monsterIndex++;
+            }
+            
+            this.spawnClusters.push(cluster);
+        }
+    },
+    
+    spawnWave(waveConfig, isBossWave) {
+        this.generateSpawnClusters(waveConfig, isBossWave);
+        this.clusterSpawnTimer = Date.now();
+        this.currentClusterIndex = 0;
+        
+        // Start spawning clusters
+        this.spawnNextCluster();
+    },
+    
+    spawnNextCluster() {
+        if (this.currentClusterIndex >= this.spawnClusters.length) {
+            // All clusters spawned
+            return;
+        }
+        
+        const cluster = this.spawnClusters[this.currentClusterIndex];
+        const spawnX = cluster.position.x;
+        const spawnY = cluster.position.y;
+        
+        // Create spawn indicator
+        const indicator = { 
+            x: spawnX, 
+            y: spawnY, 
+            timer: 800, 
+            startTime: Date.now(), 
+            isBoss: false,
+            clusterIndex: this.currentClusterIndex
+        };
+        this.spawnIndicators.push(indicator);
+        
+        // Schedule monster spawns within the cluster
+        setTimeout(() => {
+            if (Game.state !== GAME_STATE.WAVE) return;
+            
+            // Remove indicator
+            const idx = this.spawnIndicators.indexOf(indicator);
+            if (idx > -1) this.spawnIndicators.splice(idx, 1);
+            
+            // Spawn monsters in a tight cluster around the spawn point
+            const spawnRadius = 40 + Math.random() * 30; // Close together
+            
+            for (let i = 0; i < cluster.monsters.length; i++) {
+                const typeKey = cluster.monsters[i];
+                // Add slight delay between individual monster spawns in the cluster
                 setTimeout(() => {
-                    if (Game.state !== GAME_STATE.WAVE) { Game.pendingSpawns--; return; }
-                    const idx = this.spawnIndicators.indexOf(indicator);
-                    if (idx > -1) this.spawnIndicators.splice(idx, 1);
-                    this.create(task.typeKey, false, task.x, task.y);
-                    Game.pendingSpawns--;
-                }, 1000);
-            }, task.delay);
-        });
+                    if (Game.state !== GAME_STATE.WAVE) return;
+                    
+                    // Random position within the cluster radius
+                    const angle = Math.random() * Math.PI * 2;
+                    const distance = Math.random() * spawnRadius;
+                    const x = spawnX + Math.cos(angle) * distance;
+                    const y = spawnY + Math.sin(angle) * distance;
+                    
+                    this.create(typeKey, false, x, y);
+                }, i * 100); // 100ms between each monster in cluster
+            }
+        }, 800);
+        
+        // Schedule next cluster
+        this.currentClusterIndex++;
+        setTimeout(() => {
+            this.spawnNextCluster();
+        }, this.clusterSpawnDelay);
     },
     
     spawnBoss() {
+        // Boss spawns separately at center
         const bossX = CONFIG.CANVAS_WIDTH / 2, bossY = CONFIG.CANVAS_HEIGHT / 2;
         Game.pendingSpawns++;
         const indicator = { x: bossX, y: bossY, timer: 2000, startTime: Date.now(), isBoss: true };
@@ -168,8 +287,18 @@ const Monsters = {
     },
     
     update(currentTime) {
-        for (let i = this.spawnIndicators.length - 1; i >= 0; i--) { if (currentTime - this.spawnIndicators[i].startTime > this.spawnIndicators[i].timer) this.spawnIndicators.splice(i, 1); }
-        for (let monster of this.active) { if (monster.isDasher) this.updateDasher(monster, currentTime); }
+        // Update spawn indicators
+        for (let i = this.spawnIndicators.length - 1; i >= 0; i--) { 
+            if (currentTime - this.spawnIndicators[i].startTime > this.spawnIndicators[i].timer) 
+                this.spawnIndicators.splice(i, 1); 
+        }
+        
+        // Update dashers
+        for (let monster of this.active) { 
+            if (monster.isDasher) this.updateDasher(monster, currentTime); 
+        }
+        
+        // Update all monsters
         for (let i = this.active.length - 1; i >= 0; i--) {
             const monster = this.active[i];
             if (monster.slowed && monster.slowUntil < currentTime) { monster.slowed = false; monster.speed = monster.originalSpeed; }
@@ -341,11 +470,47 @@ const Monsters = {
     drawIndicators() {
         const ctx = Game.ctx, currentTime = Date.now();
         for (let indicator of this.spawnIndicators) {
-            const elapsed = currentTime - indicator.startTime; if (elapsed > indicator.timer) continue;
-            const pulseScale = 1 + Math.sin(elapsed / indicator.timer * Math.PI * 4) * 0.2, alpha = 1 - (elapsed / indicator.timer) * 0.5;
-            ctx.save(); ctx.translate(indicator.x, indicator.y);
-            if (indicator.isBoss) { ctx.strokeStyle = `rgba(255,215,0,${alpha})`; ctx.lineWidth = 4; ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 20 * alpha; ctx.rotate(elapsed * 0.002); ctx.beginPath(); ctx.arc(0, 0, 40 * pulseScale, 0, Math.PI * 2); ctx.stroke(); ctx.beginPath(); ctx.arc(0, 0, 25, 0, Math.PI * 2); ctx.stroke(); ctx.rotate(-elapsed * 0.002); ctx.beginPath(); ctx.moveTo(-30,-30); ctx.lineTo(30,30); ctx.moveTo(30,-30); ctx.lineTo(-30,30); ctx.stroke(); }
-            else { ctx.strokeStyle = `rgba(255,0,0,${alpha})`; ctx.lineWidth = 3; ctx.shadowColor = '#f00'; ctx.shadowBlur = 10 * alpha; ctx.beginPath(); ctx.arc(0, 0, 25 * pulseScale, 0, Math.PI * 2); ctx.stroke(); ctx.beginPath(); ctx.moveTo(-15,-15); ctx.lineTo(15,15); ctx.moveTo(15,-15); ctx.lineTo(-15,15); ctx.stroke(); }
+            const elapsed = currentTime - indicator.startTime; 
+            if (elapsed > indicator.timer) continue;
+            const pulseScale = 1 + Math.sin(elapsed / indicator.timer * Math.PI * 4) * 0.2, 
+                alpha = 1 - (elapsed / indicator.timer) * 0.5;
+            
+            ctx.save(); 
+            ctx.translate(indicator.x, indicator.y);
+            
+            // Draw cluster indicator with multiple rings
+            const numRings = 2 + Math.floor(elapsed / 200) % 2;
+            for (let i = 0; i < numRings; i++) {
+                const ringAlpha = alpha * (1 - i * 0.3);
+                const ringRadius = 25 * pulseScale + i * 12;
+                ctx.strokeStyle = `rgba(255, ${100 + i * 50}, 0, ${ringAlpha})`;
+                ctx.lineWidth = 3 - i * 0.5;
+                ctx.shadowColor = '#ff6600';
+                ctx.shadowBlur = 10 * ringAlpha;
+                ctx.beginPath(); 
+                ctx.arc(0, 0, ringRadius, 0, Math.PI * 2); 
+                ctx.stroke();
+            }
+            
+            // Crosshair
+            ctx.strokeStyle = `rgba(255,200,0,${alpha})`;
+            ctx.lineWidth = 2;
+            ctx.shadowBlur = 0;
+            const crossSize = 10 + elapsed / 100 * 2;
+            ctx.beginPath();
+            ctx.moveTo(-crossSize, -crossSize);
+            ctx.lineTo(crossSize, crossSize);
+            ctx.moveTo(crossSize, -crossSize);
+            ctx.lineTo(-crossSize, crossSize);
+            ctx.stroke();
+            
+            // Circle
+            ctx.strokeStyle = `rgba(255,200,0,${alpha * 0.3})`;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(0, 0, 15 + elapsed / 30, 0, Math.PI * 2);
+            ctx.stroke();
+            
             ctx.restore();
         }
     }
