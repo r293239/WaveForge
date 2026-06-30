@@ -151,9 +151,11 @@ const Waves = {
         
         // Spawn monsters
         if (waveConfig.isBoss || (Game.sandboxMode && Game.wave > 40 && Game.wave % 10 === 0)) {
+            // Boss waves: spawn boss first, then clusters of minions
             Monsters.spawnBoss();
             Monsters.spawnWave(waveConfig, true);
         } else {
+            // Regular waves: spawn in clusters
             Monsters.spawnWave(waveConfig, false);
         }
         
@@ -163,14 +165,15 @@ const Waves = {
         Save.saveGame();  // Auto-save at the start of a wave
         
         HUD.updateStats();
-        document.getElementById('monsterCount').textContent = `Monsters: ${Game.pendingSpawns}`;
+        document.getElementById('monsterCount').textContent = `Monsters: ${Monsters.active.length + Game.pendingSpawns}`;
     },
     
     // Check if wave is complete
     checkWaveEnd() {
         if (!Game.waveActive) return;
         
-        if (Monsters.active.length === 0 && Game.pendingSpawns <= 0) {
+        // Wave is complete when all monsters are dead AND no pending spawns
+        if (Monsters.active.length === 0 && Game.pendingSpawns === 0) {
             Game.wave++;
             Game.waveComplete();
         }
