@@ -10,6 +10,8 @@ const Monsters = {
     currentClusterIndex: 0,
     monstersPerCluster: 3,
     clusterSpawnDelay: 500, // ms between cluster spawns
+    totalSpawned: 0,
+    totalToSpawn: 0,
     
     init() { 
         this.active = []; 
@@ -17,6 +19,8 @@ const Monsters = {
         this.spawnClusters = [];
         this.clusterSpawnTimer = 0;
         this.currentClusterIndex = 0;
+        this.totalSpawned = 0;
+        this.totalToSpawn = 0;
     },
     
     reset() { 
@@ -25,6 +29,8 @@ const Monsters = {
         this.spawnClusters = [];
         this.clusterSpawnTimer = 0;
         this.currentClusterIndex = 0;
+        this.totalSpawned = 0;
+        this.totalToSpawn = 0;
     },
     
     getAttackRange(typeKey, radius) {
@@ -92,9 +98,11 @@ const Monsters = {
     generateSpawnClusters(waveConfig, isBossWave) {
         this.spawnClusters = [];
         this.currentClusterIndex = 0;
+        this.totalSpawned = 0;
         
         const countMultiplier = Game.difficultyMultipliers.monsterCountMultiplier || 1;
         const totalMonsters = Math.max(1, Math.floor(waveConfig.monsters * countMultiplier));
+        this.totalToSpawn = totalMonsters;
         
         const monsterTypes = isBossWave ? Waves.getNonBossTypesForWave(Game.wave) : Waves.getMonsterTypesForWave(Game.wave);
         
@@ -171,6 +179,9 @@ const Monsters = {
         const spawnX = cluster.position.x;
         const spawnY = cluster.position.y;
         
+        // Add pending spawns for this cluster
+        Game.pendingSpawns += cluster.monsters.length;
+        
         // Create spawn indicator
         const indicator = { 
             x: spawnX, 
@@ -206,6 +217,11 @@ const Monsters = {
                     const y = spawnY + Math.sin(angle) * distance;
                     
                     this.create(typeKey, false, x, y);
+                    this.totalSpawned++;
+                    Game.pendingSpawns--;
+                    
+                    // Update monster count display
+                    document.getElementById('monsterCount').textContent = `Monsters: ${Monsters.active.length + Game.pendingSpawns}`;
                 }, i * 100); // 100ms between each monster in cluster
             }
         }, 800);
@@ -230,6 +246,7 @@ const Monsters = {
             const boss = this.create('BOSS', true, bossX, bossY);
             if (boss) { boss.lifeSteal = 0.1; Boss.setupBoss(boss, Game.wave); }
             Game.pendingSpawns--;
+            document.getElementById('monsterCount').textContent = `Monsters: ${Monsters.active.length + Game.pendingSpawns}`;
         }, 2000);
     },
     
@@ -261,6 +278,7 @@ const Monsters = {
         if (monster.isSplitter) this.split(monster);
         MonsterBrain.onMonsterDeath(monster);
         this.remove(monster, index);
+        document.getElementById('monsterCount').textContent = `Monsters: ${this.active.length + Game.pendingSpawns}`;
     },
     
     explode(monster) {
