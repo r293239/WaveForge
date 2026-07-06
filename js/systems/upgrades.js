@@ -74,7 +74,15 @@ const Upgrades = {
             this.applyStatBuff(buff);
         }
         
-        Messages.show(`Selected: ${buff.name}`);
+        // Show appropriate message
+        let message = `Selected: ${buff.name}`;
+        if (buff.weaponId) {
+            const weapon = Player.getWeaponById(buff.weaponId);
+            if (weapon) {
+                message = `${buff.name} applied to ${weapon.name}!`;
+            }
+        }
+        Messages.show(message);
         document.getElementById('waveCompleteOverlay').style.display = 'none';
         
         Game.state = GAME_STATE.SHOP;
@@ -113,14 +121,25 @@ const Upgrades = {
     // Silent version – applies upgrade effects to a weapon instance without UI message
     applyWeaponUpgradeSilent(upgrade, weapon) {
         const e = upgrade.effect;
-        if (e.poisonDamage) { weapon.poisonDamage = e.poisonDamage; weapon.poisonDuration = e.poisonDuration; }
-        if (e.fireDamage) { weapon.fireDamage = e.fireDamage; weapon.fireDuration = e.fireDuration; }
-        if (e.bleedDamage) { weapon.bleedDamage = e.bleedDamage; weapon.bleedDuration = e.bleedDuration; }
+        
+        // Melee upgrades
+        if (e.poisonDamage) { 
+            weapon.poisonDamage = e.poisonDamage; 
+            weapon.poisonDuration = e.poisonDuration; 
+        }
+        if (e.fireDamage) { 
+            weapon.fireDamage = e.fireDamage; 
+            weapon.fireDuration = e.fireDuration; 
+        }
+        if (e.bleedDamage) { 
+            weapon.bleedDamage = e.bleedDamage; 
+            weapon.bleedDuration = e.bleedDuration; 
+        }
         if (e.attackSpeedMult) weapon.attackSpeed *= e.attackSpeedMult;
         if (e.critChance) Player.criticalChance += e.critChance;
         if (e.stunDuration) weapon.stunDuration = e.stunDuration;
         
-        // Loyal Trident
+        // Spear/Trident upgrades
         if (e.returningWeapon) {
             weapon.isThrowable = true;
             weapon.returnSpeed = 12;
@@ -129,22 +148,49 @@ const Upgrades = {
             weapon.currentAmmo = 1;
             weapon.resetEachRound = true;
         }
-        
-        // Channeling Trident
         if (e.lightningStrike) weapon.lightningStrike = true;
         if (e.removePierce) weapon.pierceCount = 1;
         
+        // Ranged upgrades
         if (e.pelletCount) weapon.pelletCount = e.pelletCount;
         if (e.spreadAngle) weapon.spreadAngle = e.spreadAngle;
         if (e.spreadMult) weapon.spreadAngle = Math.floor(weapon.spreadAngle * e.spreadMult);
-        if (e.slugMode) { weapon.pelletCount = 1; weapon.baseDamage += e.slugDamage; weapon.spreadAngle = 0; }
+        
+        // Shotgun specific
+        if (e.slugMode) { 
+            weapon.slugMode = true;
+            weapon.pelletCount = 1; 
+            weapon.baseDamage += e.slugDamage; 
+            weapon.spreadAngle = 0; 
+        }
+        if (e.chokeMod) weapon.chokeMod = true;
+        
+        // Machine Gun specific
         if (e.pierceCount) weapon.pierceCount = e.pierceCount;
+        
+        // Laser specific
         if (e.forkLaser) weapon.forkLaser = true;
+        
+        // Boomerang specific
         if (e.doubleThrow) weapon.doubleThrow = true;
         if (e.orbitalMode) weapon.orbitalMode = true;
-        if (e.bounceCount) { weapon.bounceCount = e.bounceCount; weapon.bounceRange = e.bounceRange; }
-        if (e.explosiveShot) { weapon.explosiveShot = true; weapon.explosiveDamage = e.explosiveDamage; weapon.explosiveRadius = e.explosiveRadius; }
+        
+        // Throwing Knives specific
+        if (e.bounceCount) { 
+            weapon.bounceCount = e.bounceCount; 
+            weapon.bounceRange = e.bounceRange; 
+        }
+        
+        // Sniper and Crossbow specific
+        if (e.explosiveShot) { 
+            weapon.explosiveShot = true; 
+            weapon.explosiveDamage = e.explosiveDamage; 
+            weapon.explosiveRadius = e.explosiveRadius; 
+        }
         if (e.tripleShot) weapon.tripleShot = true;
+        
+        // Handgun specific
+        if (e.doubleTap) weapon.doubleTap = true;
     },
     
     // Apply weapon upgrade (with message)
