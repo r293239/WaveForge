@@ -57,6 +57,18 @@ class WeaponInstance {
         this.pierceCount = weaponData.pierceCount || 1;
         this.dualStrike = weaponData.dualStrike || false;
         
+        // Upgrade properties (add these)
+        this.doubleTap = false;  // Handgun Double Tap
+        this.chokeMod = false;   // Shotgun Choke Mod
+        this.slugMode = false;   // Shotgun Slug Rounds
+        this.forkLaser = false;  // Laser Prism Lens
+        this.doubleThrow = false;  // Boomerang Twin Boomerangs
+        this.orbitalMode = false;  // Boomerang Orbital Path
+        this.explosiveShot = false;  // Sniper Explosive Rounds, Crossbow Blasting Bolts
+        this.explosiveDamage = 0;
+        this.explosiveRadius = 0;
+        this.tripleShot = false;  // Crossbow Triple Shot
+        
         this.bladeColor = weaponData.bladeColor || weaponData.swingColor;
         this.hiltColor = weaponData.hiltColor || '#8B4513';
         this.handleColor = weaponData.handleColor || '#654321';
@@ -87,13 +99,6 @@ class WeaponInstance {
         this.bleedDamage = null;
         this.bleedDuration = null;
         this.stunDuration = null;
-        this.doubleThrow = false;
-        this.orbitalMode = false;
-        this.tripleShot = false;
-        this.explosiveShot = false;
-        this.explosiveDamage = 0;
-        this.explosiveRadius = 0;
-        this.forkLaser = false;
         
         // Trident properties
         this.lightningStrike = false;
