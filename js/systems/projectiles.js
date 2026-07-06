@@ -236,11 +236,21 @@ const Projectiles = {
     
     applyLightningStrike(monster) { const targets = [monster]; for (let i = 0; i < 3; i++) { const last = targets[targets.length-1]; let nearest = null, nd = 100; for (let o of Monsters.active) { if (targets.includes(o)) continue; const d = Physics.distance(last, o); if (d < nd) { nd = d; nearest = o; } } if (nearest) targets.push(nearest); else break; } for (let i = 0; i < targets.length; i++) { targets[i].health -= 25; Effects.damageIndicator(targets[i].x, targets[i].y, 25, true); if (i > 0) Effects.lightningBolt(targets[i-1].x, targets[i-1].y, targets[i].x, targets[i].y); } },
     
-    // ---- DAMAGE APPLICATION (with lifesteal accumulator) ----
+    // ---- DAMAGE APPLICATION (with all upgrade effects) ----
     applyProjectileDamage(proj, monster, mi, pi) {
         let dmg = proj.damage * Player.damageMultiplier * Game.difficultyMultipliers.playerDamage;
-        if (Math.random() < Player.criticalChance) { dmg *= 2; Effects.damageIndicator(monster.x, monster.y, Math.floor(dmg), true); } else Effects.damageIndicator(monster.x, monster.y, Math.floor(dmg), false);
+        
+        // Critical hit
+        if (Math.random() < Player.criticalChance) { 
+            dmg *= 2; 
+            Effects.damageIndicator(monster.x, monster.y, Math.floor(dmg), true); 
+        } else {
+            Effects.damageIndicator(monster.x, monster.y, Math.floor(dmg), false); 
+        }
+        
         monster.health -= dmg;
+        
+        // Lifesteal
         if (Player.lifeSteal > 0) {
             const rawHeal = dmg * Player.lifeSteal;
             Player.lifeStealRemainder += rawHeal;
@@ -250,11 +260,108 @@ const Projectiles = {
                 Player.lifeStealRemainder -= healAmount;
             }
         }
-        if (proj.weaponRef && proj.weaponRef.isThrowable) proj.weaponRef.trackKnifeHit(monster);
-        if (proj.weaponRef && proj.weaponRef.explosiveShot) { const er = proj.weaponRef.explosiveRadius || 50, ed = proj.weaponRef.explosiveDamage || 25; Effects.explosion(monster.x, monster.y, er, '#FF6600'); for (let k = Monsters.active.length - 1; k >= 0; k--) { if (k === mi) continue; const o = Monsters.active[k]; if (Physics.distance(monster, o) < er + o.radius) { o.health -= ed; Effects.damageIndicator(o.x, o.y, ed, false); if (o.health <= 0) Monsters.handleDeath(o, k); } } }
-        if (!proj.isBoomerang && !proj.bounceCount && !proj.isThrownTrident) this.active.splice(pi, 1);
-        else if (proj.bounceCount > 0) { proj.bounceCount--; proj.targetsHit.push(monster); if (proj.bounceCount <= 0) this.active.splice(pi, 1); else { let nearest = null, nd = proj.bounceRange || 100; for (let k = 0; k < Monsters.active.length; k++) { if (k === mi || proj.targetsHit.includes(Monsters.active[k])) continue; const d = Physics.distance(monster, Monsters.active[k]); if (d < nd) { nd = d; nearest = Monsters.active[k]; } } if (nearest) { proj.angle = Math.atan2(nearest.y - monster.y, nearest.x - monster.x); proj.x = monster.x; proj.y = monster.y; proj.distanceTraveled = 0; } else this.active.splice(pi, 1); } }
-        if (monster.health <= 0) Monsters.handleDeath(monster, mi);
+        
+        // Track knife hits for throwing knives
+        if (proj.weaponRef && proj.weaponRef.isThrowable) {
+            proj.weaponRef.trackKnifeHit(monster);
+        }
+        
+        // Explosive Shot (Sniper Explosive Rounds, Crossbow Blasting Bolts)
+        if (proj.weaponRef && proj.weaponRef.explosiveShot) {
+            const er = proj.weaponRef.explosiveRadius || 50;
+            const ed = proj.weaponRef.explosiveDamage || 25;
+            Effects.explosion(monster.x, monster.y, er, '#FF6600');
+            Messages.show(`Explosion! ${ed} damage AOE`, 1000);
+            
+            for (let k = Monsters.active.length - 1; k >= 0; k--) {
+                if (k === mi) continue;
+                const o = Monsters.active[k];
+                if (Physics.distance(monster, o) < er + o.radius) {
+                    o.health -= ed;
+                    Effects.damageIndicator(o.x, o.y, ed, false);
+                    if (o.health <= 0) Monsters.handleDeath(o, k);
+                }
+            }
+        }
+        
+        // Armor Piercing (Machine Gun)
+        if (proj.weaponRef && proj.weaponRef.pierceCount > 1 && !proj.isBoomerang) {
+            proj.pierceCount = proj.weaponRef.pierceCount || 1;
+            if (!proj.piercedEnemies) proj.piercedEnemies = [];
+            proj.piercedEnemies.push(monster);
+            
+            if (proj.piercedEnemies.length >= proj.pierceCount) {
+                // Remove projectile after piercing enough enemies
+                this.active.splice(pi, 1);
+            } else {
+                // Continue flying
+                proj.distanceTraveled = 0;
+                // Find next target
+                let nearest = null;
+                let nd = 150;
+                for (let k = 0; k < Monsters.active.length; k++) {
+                    if (k === mi || proj.piercedEnemies.includes(Monsters.active[k])) continue;
+                    const d = Physics.distance(monster, Monsters.active[k]);
+                    if (d < nd) {
+                        nd = d;
+                        nearest = Monsters.active[k];
+                    }
+                }
+                if (nearest) {
+                    proj.angle = Math.atan2(nearest.y - monster.y, nearest.x - monster.x);
+                    proj.x = monster.x;
+                    proj.y = monster.y;
+                } else {
+                    this.active.splice(pi, 1);
+                }
+            }
+        }
+        // Ricochet Blades (Throwing Knives)
+        else if (proj.weaponRef && proj.weaponRef.bounceCount > 0 && !proj.isBoomerang) {
+            if (!proj.bounceCount) proj.bounceCount = proj.weaponRef.bounceCount || 1;
+            if (!proj.bounceRange) proj.bounceRange = proj.weaponRef.bounceRange || 150;
+            if (!proj.targetsHit) proj.targetsHit = [];
+            
+            proj.targetsHit.push(monster);
+            proj.bounceCount--;
+            
+            if (proj.bounceCount <= 0) {
+                this.active.splice(pi, 1);
+            } else {
+                // Find next target to bounce to
+                let nearest = null;
+                let nd = proj.bounceRange || 150;
+                for (let k = 0; k < Monsters.active.length; k++) {
+                    if (k === mi || proj.targetsHit.includes(Monsters.active[k])) continue;
+                    const d = Physics.distance(monster, Monsters.active[k]);
+                    if (d < nd) {
+                        nd = d;
+                        nearest = Monsters.active[k];
+                    }
+                }
+                if (nearest) {
+                    proj.angle = Math.atan2(nearest.y - monster.y, nearest.x - monster.x);
+                    proj.x = monster.x;
+                    proj.y = monster.y;
+                    proj.distanceTraveled = 0;
+                    Messages.show(`Ricochet! Bounced to ${nearest.type}`, 1000);
+                } else {
+                    this.active.splice(pi, 1);
+                }
+            }
+        }
+        // Regular projectile (no special effects)
+        else if (!proj.isBoomerang && !proj.bounceCount && !proj.isThrownTrident && !proj.pierceCount) {
+            this.active.splice(pi, 1);
+        }
+        // Fork Laser - handled separately
+        else if (proj.weaponRef && proj.weaponRef.forkLaser && proj.weaponId === 'laser') {
+            // Don't remove, laser keeps going
+        }
+        
+        if (monster.health <= 0) {
+            Monsters.handleDeath(monster, mi);
+        }
     },
     
     // ---- BOSS / MONSTER PROJECTILES ----
