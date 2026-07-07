@@ -1,5 +1,5 @@
 // ============================================
-// WAVEFORGE - Map Definitions
+// WAVEFORGE - Map Definitions & Selection
 // ============================================
 
 const MAP_DEFINITIONS = {
@@ -134,20 +134,25 @@ const MapGenerators = {
         return [];
     },
     
-    // Maze - random maze pattern
+    // Maze - guaranteed paths, no trap boxes
     generateMaze() {
         const walls = [];
         const cellSize = 60;
-        const cols = Math.floor(CONFIG.CANVAS_WIDTH / cellSize);
-        const rows = Math.floor(CONFIG.CANVAS_HEIGHT / cellSize);
-        const maze = this.generateMazeGrid(cols, rows);
+        const cols = Math.floor((CONFIG.CANVAS_WIDTH - 40) / cellSize);
+        const rows = Math.floor((CONFIG.CANVAS_HEIGHT - 40) / cellSize);
         
+        // Simple grid with guaranteed paths
         for (let y = 0; y < rows; y++) {
             for (let x = 0; x < cols; x++) {
-                if (maze[y][x] === 1) {
+                // Keep border cells open
+                if (y === 0 || y === rows-1 || x === 0 || x === cols-1) continue;
+                // Keep every other cell open (grid pattern)
+                if (x % 2 === 0 && y % 2 === 0) continue;
+                // Random walls with lower density
+                if (Math.random() < 0.35) {
                     walls.push({
-                        x: x * cellSize + cellSize/2,
-                        y: y * cellSize + cellSize/2,
+                        x: 20 + x * cellSize + cellSize/2,
+                        y: 20 + y * cellSize + cellSize/2,
                         width: cellSize,
                         height: cellSize,
                         color: '#2a2a4a',
@@ -156,52 +161,24 @@ const MapGenerators = {
                 }
             }
         }
+        
+        // Add some additional random walls but keep them small and spaced
+        const numWalls = 3 + Math.floor(Math.random() * 6);
+        for (let i = 0; i < numWalls; i++) {
+            const x = 60 + Math.random() * (CONFIG.CANVAS_WIDTH - 120);
+            const y = 60 + Math.random() * (CONFIG.CANVAS_HEIGHT - 120);
+            // Don't block center
+            if (Math.hypot(x - CONFIG.CANVAS_WIDTH/2, y - CONFIG.CANVAS_HEIGHT/2) < 100) continue;
+            walls.push({
+                x, y,
+                width: 30 + Math.random() * 30,
+                height: 30 + Math.random() * 30,
+                color: '#3a3a5a',
+                health: 80
+            });
+        }
+        
         return walls;
-    },
-    
-    // Generate maze grid using DFS
-    generateMazeGrid(cols, rows) {
-        const grid = [];
-        for (let y = 0; y < rows; y++) {
-            grid[y] = [];
-            for (let x = 0; x < cols; x++) {
-                grid[y][x] = 1;
-            }
-        }
-        
-        // Simple maze generation (DFS)
-        const stack = [{x: 1, y: 1}];
-        grid[1][1] = 0;
-        
-        while (stack.length > 0) {
-            const current = stack[stack.length - 1];
-            const neighbors = [];
-            const directions = [
-                {dx: 0, dy: -2}, {dx: 0, dy: 2},
-                {dx: -2, dy: 0}, {dx: 2, dy: 0}
-            ];
-            
-            for (let dir of directions) {
-                const nx = current.x + dir.dx;
-                const ny = current.y + dir.dy;
-                if (nx > 0 && nx < cols-1 && ny > 0 && ny < rows-1) {
-                    if (grid[ny][nx] === 1) {
-                        neighbors.push({x: nx, y: ny, dir: dir});
-                    }
-                }
-            }
-            
-            if (neighbors.length > 0) {
-                const next = neighbors[Math.floor(Math.random() * neighbors.length)];
-                grid[current.y + next.dir.dy/2][current.x + next.dir.dx/2] = 0;
-                grid[next.y][next.x] = 0;
-                stack.push({x: next.x, y: next.y});
-            } else {
-                stack.pop();
-            }
-        }
-        
-        return grid;
     },
     
     // Crossroads - four corridors meeting in center
@@ -212,43 +189,43 @@ const MapGenerators = {
         const corridorWidth = 80;
         const wallThickness = 20;
         
-        // Four quadrants with corridors
+        // Four quadrants with corridors - leave gaps for monsters
         // Top-left quadrant walls
         walls.push({
-            x: centerX - corridorWidth/2 - wallThickness,
-            y: centerY - corridorWidth/2 - wallThickness,
-            width: corridorWidth/2 + wallThickness,
-            height: corridorWidth/2 + wallThickness,
+            x: centerX - corridorWidth/2 - wallThickness/2,
+            y: centerY - corridorWidth/2 - wallThickness/2,
+            width: corridorWidth/2 + wallThickness/2,
+            height: corridorWidth/2 + wallThickness/2,
             color: '#2a2a4a',
             health: 100
         });
         
         // Top-right quadrant walls
         walls.push({
-            x: centerX + corridorWidth/2,
-            y: centerY - corridorWidth/2 - wallThickness,
-            width: corridorWidth/2 + wallThickness,
-            height: corridorWidth/2 + wallThickness,
+            x: centerX + corridorWidth/2 + wallThickness/2,
+            y: centerY - corridorWidth/2 - wallThickness/2,
+            width: corridorWidth/2 + wallThickness/2,
+            height: corridorWidth/2 + wallThickness/2,
             color: '#2a2a4a',
             health: 100
         });
         
         // Bottom-left quadrant walls
         walls.push({
-            x: centerX - corridorWidth/2 - wallThickness,
-            y: centerY + corridorWidth/2,
-            width: corridorWidth/2 + wallThickness,
-            height: corridorWidth/2 + wallThickness,
+            x: centerX - corridorWidth/2 - wallThickness/2,
+            y: centerY + corridorWidth/2 + wallThickness/2,
+            width: corridorWidth/2 + wallThickness/2,
+            height: corridorWidth/2 + wallThickness/2,
             color: '#2a2a4a',
             health: 100
         });
         
         // Bottom-right quadrant walls
         walls.push({
-            x: centerX + corridorWidth/2,
-            y: centerY + corridorWidth/2,
-            width: corridorWidth/2 + wallThickness,
-            height: corridorWidth/2 + wallThickness,
+            x: centerX + corridorWidth/2 + wallThickness/2,
+            y: centerY + corridorWidth/2 + wallThickness/2,
+            width: corridorWidth/2 + wallThickness/2,
+            height: corridorWidth/2 + wallThickness/2,
             color: '#2a2a4a',
             health: 100
         });
@@ -263,6 +240,7 @@ const MapGenerators = {
         const centerY = CONFIG.CANVAS_HEIGHT / 2;
         const segments = 20;
         const wallThickness = 15;
+        const gapSize = 30; // Gaps between spiral segments
         
         for (let i = 0; i < segments; i++) {
             const t = i / segments;
@@ -271,12 +249,14 @@ const MapGenerators = {
             const x = centerX + Math.cos(angle) * radius;
             const y = centerY + Math.sin(angle) * radius;
             
-            // Create wall segment
+            // Leave gaps for monsters to pass
+            if (i % 3 === 0) continue;
+            
             walls.push({
                 x: x,
                 y: y,
                 width: wallThickness,
-                height: 30 + t * 40,
+                height: 25 + t * 30,
                 color: '#2a2a4a',
                 health: 100,
                 angle: angle + Math.PI/2
@@ -291,15 +271,22 @@ const MapGenerators = {
         const walls = [];
         const wallThickness = 15;
         const margin = 30;
-        
-        // Outer walls with gaps for gates
         const gateWidth = 80;
         
+        // Outer walls with gaps for gates
         // Top wall
         walls.push({
             x: CONFIG.CANVAS_WIDTH/2,
             y: margin,
-            width: CONFIG.CANVAS_WIDTH - 2*margin,
+            width: CONFIG.CANVAS_WIDTH - 2*margin - gateWidth/2,
+            height: wallThickness,
+            color: '#2a2a4a',
+            health: 200
+        });
+        walls.push({
+            x: CONFIG.CANVAS_WIDTH/2 + gateWidth/2,
+            y: margin,
+            width: CONFIG.CANVAS_WIDTH - 2*margin - gateWidth/2,
             height: wallThickness,
             color: '#2a2a4a',
             health: 200
@@ -309,7 +296,15 @@ const MapGenerators = {
         walls.push({
             x: CONFIG.CANVAS_WIDTH/2,
             y: CONFIG.CANVAS_HEIGHT - margin,
-            width: CONFIG.CANVAS_WIDTH - 2*margin,
+            width: CONFIG.CANVAS_WIDTH - 2*margin - gateWidth/2,
+            height: wallThickness,
+            color: '#2a2a4a',
+            health: 200
+        });
+        walls.push({
+            x: CONFIG.CANVAS_WIDTH/2 + gateWidth/2,
+            y: CONFIG.CANVAS_HEIGHT - margin,
+            width: CONFIG.CANVAS_WIDTH - 2*margin - gateWidth/2,
             height: wallThickness,
             color: '#2a2a4a',
             health: 200
@@ -351,11 +346,11 @@ const MapGenerators = {
             health: 100
         });
         
-        // Inner walls (corridors)
+        // Inner walls (corridors) with gaps
         const innerSize = 120;
         walls.push({
             x: CONFIG.CANVAS_WIDTH/2 - innerSize/2,
-            y: CONFIG.CANVAS_HEIGHT/2,
+            y: CONFIG.CANVAS_HEIGHT/2 - 10,
             width: innerSize,
             height: wallThickness,
             color: '#3a3a5a',
@@ -363,9 +358,9 @@ const MapGenerators = {
         });
         walls.push({
             x: CONFIG.CANVAS_WIDTH/2 - innerSize/2,
-            y: CONFIG.CANVAS_HEIGHT/2,
-            width: wallThickness,
-            height: innerSize,
+            y: CONFIG.CANVAS_HEIGHT/2 + 10,
+            width: innerSize,
+            height: wallThickness,
             color: '#3a3a5a',
             health: 100
         });
@@ -382,8 +377,12 @@ const MapGenerators = {
         const outerRadius = 220;
         const segments = 24;
         const wallThickness = 20;
+        const gapSize = 40; // Gaps between ring segments
         
         for (let i = 0; i < segments; i++) {
+            // Leave gaps for monsters to pass
+            if (i % 4 === 0) continue;
+            
             const angle = (i / segments) * Math.PI * 2;
             const radius = innerRadius + (outerRadius - innerRadius) / 2;
             const x = centerX + Math.cos(angle) * radius;
@@ -400,23 +399,47 @@ const MapGenerators = {
             });
         }
         
+        // Add some inner ring walls
+        for (let i = 0; i < 12; i++) {
+            if (i % 3 === 0) continue;
+            const angle = (i / 12) * Math.PI * 2;
+            const radius = 80;
+            const x = centerX + Math.cos(angle) * radius;
+            const y = centerY + Math.sin(angle) * radius;
+            
+            walls.push({
+                x: x,
+                y: y,
+                width: 15,
+                height: 15,
+                color: '#3a3a5a',
+                health: 80,
+                angle: angle
+            });
+        }
+        
         return walls;
     },
     
     // Chaos - random walls every wave
     generateChaos() {
         const walls = [];
-        const numWalls = 8 + Math.floor(Math.random() * 12);
-        const wallSize = 40 + Math.random() * 60;
+        const numWalls = 6 + Math.floor(Math.random() * 8);
         
         for (let i = 0; i < numWalls; i++) {
             let x, y, valid = false;
             for (let attempts = 0; attempts < 20; attempts++) {
-                x = wallSize + Math.random() * (CONFIG.CANVAS_WIDTH - wallSize * 2);
-                y = wallSize + Math.random() * (CONFIG.CANVAS_HEIGHT - wallSize * 2);
+                x = 80 + Math.random() * (CONFIG.CANVAS_WIDTH - 160);
+                y = 80 + Math.random() * (CONFIG.CANVAS_HEIGHT - 160);
                 
-                // Don't spawn too close to player start
-                if (Math.hypot(x - CONFIG.CANVAS_WIDTH/2, y - CONFIG.CANVAS_HEIGHT/2) < 100) continue;
+                // Don't block center too much
+                if (Math.hypot(x - CONFIG.CANVAS_WIDTH/2, y - CONFIG.CANVAS_HEIGHT/2) < 120) continue;
+                
+                // Don't block corners (keep spawn areas open)
+                if (x < 100 && y < 100) continue;
+                if (x > CONFIG.CANVAS_WIDTH - 100 && y < 100) continue;
+                if (x < 100 && y > CONFIG.CANVAS_HEIGHT - 100) continue;
+                if (x > CONFIG.CANVAS_WIDTH - 100 && y > CONFIG.CANVAS_HEIGHT - 100) continue;
                 
                 valid = true;
                 break;
@@ -424,12 +447,11 @@ const MapGenerators = {
             
             if (valid) {
                 walls.push({
-                    x: x,
-                    y: y,
-                    width: wallSize + Math.random() * 60,
-                    height: wallSize + Math.random() * 60,
+                    x, y,
+                    width: 30 + Math.random() * 40,
+                    height: 30 + Math.random() * 40,
                     color: `hsl(${Math.random() * 60 + 240}, 30%, 20%)`,
-                    health: 50 + Math.random() * 100
+                    health: 60 + Math.random() * 60
                 });
             }
         }
@@ -449,33 +471,30 @@ const MapGenerators = {
             const y = i * floorHeight + floorHeight/2;
             const width = CONFIG.CANVAS_WIDTH * (1 - i * 0.15);
             
-            // Floor walls
+            // Floor walls with gaps
+            const gapSize = 60 + i * 10;
             walls.push({
-                x: centerX,
+                x: centerX - width/2 - 10,
                 y: y,
-                width: width,
+                width: width/2 - gapSize/2,
                 height: wallThickness,
                 color: `hsl(${220 + i * 20}, 30%, ${15 + i * 5}%)`,
                 health: 150 - i * 20
             });
-            
-            // Staircase gaps
-            if (i < floors - 1) {
-                const gapSize = 60;
-                walls.push({
-                    x: centerX - gapSize/2,
-                    y: y + 5,
-                    width: gapSize,
-                    height: 5,
-                    color: '#1a1a3a',
-                    health: 100
-                });
-            }
+            walls.push({
+                x: centerX + gapSize/2 + 10,
+                y: y,
+                width: width/2 - gapSize/2,
+                height: wallThickness,
+                color: `hsl(${220 + i * 20}, 30%, ${15 + i * 5}%)`,
+                health: 150 - i * 20
+            });
         }
         
-        // Spiral stairs
-        const stairSegments = 20;
+        // Spiral stairs with gaps
+        const stairSegments = 16;
         for (let i = 0; i < stairSegments; i++) {
+            if (i % 3 === 0) continue;
             const t = i / stairSegments;
             const angle = t * Math.PI * 4;
             const radius = 50 + t * 150;
@@ -501,35 +520,33 @@ const MapSelection = {
     selectedMap: 'open_arena',
     
     init() {
-        this.createMapSelectionOverlay();
-    },
-    
-    createMapSelectionOverlay() {
-        const overlay = document.getElementById('mapSelectionOverlay');
-        if (!overlay) {
-            // Create overlay if it doesn't exist
-            const newOverlay = document.createElement('div');
-            newOverlay.id = 'mapSelectionOverlay';
-            newOverlay.className = 'overlay';
-            newOverlay.style.display = 'none';
-            document.body.appendChild(newOverlay);
+        // Create the overlay if it doesn't exist
+        if (!document.getElementById('mapSelectionOverlay')) {
+            const overlay = document.createElement('div');
+            overlay.id = 'mapSelectionOverlay';
+            overlay.className = 'overlay';
+            overlay.style.display = 'none';
+            document.body.appendChild(overlay);
         }
     },
     
     show() {
         const overlay = document.getElementById('mapSelectionOverlay');
-        if (!overlay) return;
+        if (!overlay) {
+            console.error('MapSelection overlay not found!');
+            return;
+        }
         
-        overlay.style.display = 'flex';
+        // Build the HTML
         overlay.innerHTML = `
-            <div class="overlay-content" style="max-width: 800px;">
-                <h2 class="overlay-title">🗺️ Select Your Arena</h2>
-                <p class="overlay-text">Choose a map for your run. Each map has unique walls and challenges.</p>
-                <div class="map-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:15px;margin:20px 0;">
+            <div class="overlay-content" style="max-width: 900px; background: rgba(30,30,60,0.95); padding: 40px; border-radius: 20px; border: 3px solid #ffd700;">
+                <h2 class="overlay-title" style="font-size: 3rem; color: #ffd700; margin-bottom: 20px;">🗺️ Select Your Arena</h2>
+                <p style="color: #aaa; font-size: 1.2rem; margin-bottom: 30px;">Choose a map for your run. Each map has unique walls and challenges.</p>
+                <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:15px;margin:20px 0;">
                     ${this.generateMapButtons()}
                 </div>
                 <div style="margin-top:20px;">
-                    <button class="btn btn-primary" id="confirmMapBtn" style="width:200px;margin:0 auto;">
+                    <button class="btn btn-primary" id="confirmMapBtn" style="width:200px;margin:0 auto; padding: 15px 30px; background: linear-gradient(45deg, #ff6b6b, #ffa726); color: white; border: none; border-radius: 8px; font-size: 1.2rem; cursor: pointer;">
                         <span>⚔️</span> Start Battle
                     </button>
                 </div>
@@ -546,11 +563,17 @@ const MapSelection = {
         });
         
         // Confirm button
-        document.getElementById('confirmMapBtn').addEventListener('click', () => this.confirmMap());
-        document.getElementById('confirmMapBtn').addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            this.confirmMap();
-        });
+        const confirmBtn = document.getElementById('confirmMapBtn');
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', () => this.confirmMap());
+            confirmBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                this.confirmMap();
+            });
+        }
+        
+        // Show the overlay
+        overlay.style.display = 'flex';
     },
     
     generateMapButtons() {
@@ -581,7 +604,6 @@ const MapSelection = {
     
     selectMap(mapId) {
         this.selectedMap = mapId;
-        // Update UI
         const overlay = document.getElementById('mapSelectionOverlay');
         overlay.querySelectorAll('.map-btn').forEach(btn => {
             btn.style.background = 'rgba(50,50,100,0.3)';
@@ -594,16 +616,13 @@ const MapSelection = {
     },
     
     confirmMap() {
-        // Set the map for the game
         Game.currentMap = this.selectedMap;
         const overlay = document.getElementById('mapSelectionOverlay');
         overlay.style.display = 'none';
         
-        // Generate walls for the map
         const walls = MapGenerators.generateMap(this.selectedMap);
         Arena.setWalls(walls);
         
-        // Start the game
-        Game.startGame();
+        Game.startGameWithMap();
     }
 };
