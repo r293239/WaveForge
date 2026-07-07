@@ -51,6 +51,36 @@ const Arena = {
         return { ...this.bounds };
     },
 
+    setWalls(wallData) {
+        this.clearWalls();
+        for (let wall of wallData) {
+            this.addWall(wall.x, wall.y, wall.width, wall.height, wall.color, wall.health);
+        }
+    },
+
+    addWall(x, y, width, height, color = '#2a2a4a', health = 100) {
+        const wall = {
+            x, y, width, height,
+            hitboxRadius: Math.max(width, height) / 2,
+            isStatic: true,
+            isWall: true,
+            color: color,
+            health: health,
+            maxHealth: health,
+            destroyed: false
+        };
+        this.walls.push(wall);
+        Physics.register(wall);
+        return wall;
+    },
+
+    clearWalls() {
+        for (let wall of this.walls) {
+            Physics.unregister(wall);
+        }
+        this.walls = [];
+    },
+
     getRandomSpawnPosition(minDistFromCenter = 100, minDistFromPlayer = 150) {
         let x, y, valid = false;
         const centerX = CONFIG.CANVAS_WIDTH / 2;
@@ -77,6 +107,20 @@ const Arena = {
                     y = this.bounds.minY + Math.random() * (this.bounds.maxY - this.bounds.minY);
             }
 
+            // Check if position is inside any wall
+            let insideWall = false;
+            for (let wall of this.walls) {
+                if (wall.destroyed) continue;
+                const halfW = wall.width / 2;
+                const halfH = wall.height / 2;
+                if (x >= wall.x - halfW && x <= wall.x + halfW &&
+                    y >= wall.y - halfH && y <= wall.y + halfH) {
+                    insideWall = true;
+                    break;
+                }
+            }
+            if (insideWall) continue;
+
             if (Math.hypot(x - centerX, y - centerY) >= minDistFromCenter) {
                 if (!player || Math.hypot(x - player.x, y - player.y) >= minDistFromPlayer) {
                     valid = true;
@@ -94,10 +138,35 @@ const Arena = {
     },
 
     getRandomArenaPosition(margin = 50) {
-        return {
-            x: this.bounds.minX + margin + Math.random() * (this.bounds.maxX - this.bounds.minX - margin * 2),
-            y: this.bounds.minY + margin + Math.random() * (this.bounds.maxY - this.bounds.minY - margin * 2)
-        };
+        let x, y, valid = false;
+        for (let attempts = 0; attempts < 50; attempts++) {
+            x = this.bounds.minX + margin + Math.random() * (this.bounds.maxX - this.bounds.minX - margin * 2);
+            y = this.bounds.minY + margin + Math.random() * (this.bounds.maxY - this.bounds.minY - margin * 2);
+
+            // Check if position is inside any wall
+            let insideWall = false;
+            for (let wall of this.walls) {
+                if (wall.destroyed) continue;
+                const halfW = wall.width / 2;
+                const halfH = wall.height / 2;
+                if (x >= wall.x - halfW && x <= wall.x + halfW &&
+                    y >= wall.y - halfH && y <= wall.y + halfH) {
+                    insideWall = true;
+                    break;
+                }
+            }
+            if (!insideWall) {
+                valid = true;
+                break;
+            }
+        }
+
+        if (!valid) {
+            x = this.bounds.minX + margin + Math.random() * (this.bounds.maxX - this.bounds.minX - margin * 2);
+            y = this.bounds.minY + margin + Math.random() * (this.bounds.maxY - this.bounds.minY - margin * 2);
+        }
+
+        return { x, y };
     },
 
     isInBounds(x, y, radius = 0) {
@@ -105,25 +174,6 @@ const Arena = {
                x + radius <= this.bounds.maxX &&
                y - radius >= this.bounds.minY &&
                y + radius <= this.bounds.maxY;
-    },
-
-    addWall(x, y, width, height) {
-        const wall = {
-            x, y, width, height,
-            hitboxRadius: Math.max(width, height) / 2,
-            isStatic: true,
-            isWall: true
-        };
-        this.walls.push(wall);
-        Physics.register(wall);
-        return wall;
-    },
-
-    clearWalls() {
-        for (let wall of this.walls) {
-            Physics.unregister(wall);
-        }
-        this.walls = [];
     },
 
     draw() {
@@ -183,10 +233,30 @@ const Arena = {
 
         // Walls
         for (let wall of this.walls) {
-            ctx.fillStyle = 'rgba(100, 100, 120, 0.5)';
+            if (wall.destroyed) continue;
+            
+            // Wall shadow
+            ctx.shadowColor = 'rgba(0,0,0,0.5)';
+            ctx.shadowBlur = 10;
+            
+            // Wall body
+            ctx.fillStyle = wall.color || 'rgba(60, 60, 120, 0.7)';
             ctx.fillRect(wall.x - wall.width/2, wall.y - wall.height/2, wall.width, wall.height);
-            ctx.strokeStyle = 'rgba(150, 150, 180, 0.7)';
+            
+            // Wall border
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = 'rgba(150, 150, 200, 0.5)';
+            ctx.lineWidth = 2;
             ctx.strokeRect(wall.x - wall.width/2, wall.y - wall.height/2, wall.width, wall.height);
+            
+            // Health bar for walls
+            if (wall.health !== undefined && wall.health < wall.maxHealth) {
+                const hpPercent = wall.health / wall.maxHealth;
+                ctx.fillStyle = 'rgba(0,0,0,0.7)';
+                ctx.fillRect(wall.x - wall.width/2, wall.y - wall.height/2 - 8, wall.width, 4);
+                ctx.fillStyle = hpPercent > 0.5 ? '#0F0' : (hpPercent > 0.2 ? '#FF0' : '#F00');
+                ctx.fillRect(wall.x - wall.width/2, wall.y - wall.height/2 - 8, wall.width * hpPercent, 4);
+            }
         }
 
         // Grid
