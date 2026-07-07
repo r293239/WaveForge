@@ -314,6 +314,7 @@ const Player = {
         ctx.save();
         ctx.translate(this.entity.x, this.entity.y);
         
+        // === PLAYER BODY ===
         ctx.shadowColor = 'rgba(255, 107, 107, 0.5)';
         ctx.shadowBlur = 15;
         ctx.fillStyle = this.entity.color;
@@ -328,6 +329,7 @@ const Player = {
         ctx.arc(0, 0, this.entity.radius, 0, Math.PI * 2);
         ctx.stroke();
         
+        // === EYES ===
         ctx.save();
         ctx.rotate(this.facingAngle);
         ctx.fillStyle = '#FFF';
@@ -349,6 +351,7 @@ const Player = {
         ctx.beginPath(); ctx.moveTo(12, -1); ctx.lineTo(18, 0); ctx.moveTo(12, 1); ctx.lineTo(18, 0); ctx.stroke();
         ctx.restore();
         
+        // === WEAPON POINTER ===
         ctx.save();
         ctx.rotate(this.facingAngle);
         ctx.strokeStyle = '#fc0';
@@ -366,6 +369,7 @@ const Player = {
         ctx.fill();
         ctx.restore();
         
+        // === SPECIAL EFFECTS (Runic Plate, Blood Contract, Slow Field) ===
         if (this.firstHitReduction && this.firstHitActive) {
             ctx.strokeStyle = '#0FF'; ctx.lineWidth = 3;
             ctx.shadowColor = '#0FF'; ctx.shadowBlur = 20;
@@ -391,5 +395,93 @@ const Player = {
         }
         
         ctx.restore();
+        
+        // === CUSTOM PLAYER HEALTH BAR ===
+        this.drawHealthBar(ctx);
+    },
+    
+    // === NEW: CUSTOM PLAYER HEALTH BAR ===
+    drawHealthBar(ctx) {
+        if (!this.entity) return;
+        
+        const x = this.entity.x;
+        const y = this.entity.y - this.entity.radius - 25;
+        const width = 60;
+        const height = 8;
+        const hpPercent = Math.max(0, Math.min(1, this.health / this.maxHealth));
+        
+        // Outer border with glow
+        ctx.save();
+        ctx.shadowColor = hpPercent > 0.5 ? 'rgba(0, 255, 0, 0.3)' : 
+                         (hpPercent > 0.25 ? 'rgba(255, 200, 0, 0.3)' : 'rgba(255, 0, 0, 0.3)');
+        ctx.shadowBlur = 10;
+        
+        // Background (dark)
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(x - width/2 - 2, y - 2, width + 4, height + 4, 4);
+        ctx.fill();
+        ctx.stroke();
+        
+        // Health fill with gradient
+        const gradient = ctx.createLinearGradient(x - width/2, y, x + width/2, y);
+        if (hpPercent > 0.5) {
+            gradient.addColorStop(0, '#00ff88');
+            gradient.addColorStop(1, '#00cc66');
+        } else if (hpPercent > 0.25) {
+            gradient.addColorStop(0, '#ffaa00');
+            gradient.addColorStop(1, '#ff8800');
+        } else {
+            gradient.addColorStop(0, '#ff4444');
+            gradient.addColorStop(1, '#cc0000');
+        }
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.roundRect(x - width/2, y, width * hpPercent, height, 2);
+        ctx.fill();
+        
+        // Glow effect on the health bar
+        if (hpPercent > 0) {
+            ctx.shadowColor = hpPercent > 0.5 ? 'rgba(0, 255, 100, 0.5)' : 
+                             (hpPercent > 0.25 ? 'rgba(255, 200, 0, 0.5)' : 'rgba(255, 0, 0, 0.5)');
+            ctx.shadowBlur = 8;
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+            ctx.beginPath();
+            ctx.roundRect(x - width/2, y, width * hpPercent, height/2, 2);
+            ctx.fill();
+        }
+        ctx.shadowBlur = 0;
+        
+        // HP text
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 9px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+        ctx.shadowBlur = 4;
+        ctx.fillText(`${Math.floor(this.health)}/${this.maxHealth}`, x, y - 3);
+        
+        // Heart icon
+        ctx.font = '10px Arial';
+        ctx.fillText('❤️', x - width/2 - 14, y + height - 1);
+        
+        ctx.restore();
     }
 };
+
+// Helper: roundRect polyfill for older browsers
+if (!CanvasRenderingContext2D.prototype.roundRect) {
+    CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+        if (r > w/2) r = w/2;
+        if (r > h/2) r = h/2;
+        this.moveTo(x + r, y);
+        this.arcTo(x + w, y, x + w, y + h, r);
+        this.arcTo(x + w, y + h, x, y + h, r);
+        this.arcTo(x, y + h, x, y, r);
+        this.arcTo(x, y, x + w, y, r);
+        return this;
+    };
+}
