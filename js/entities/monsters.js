@@ -304,6 +304,32 @@ const Monsters = {
         Effects.explosion(monster.x, monster.y, 50, '#0F0');
     },
     
+    // NEW: Allow monsters to attack walls
+    checkWallAttack(monster, currentTime) {
+        if (currentTime - monster.lastAttack < monster.attackCooldown) return false;
+        
+        for (let wall of Arena.walls) {
+            if (wall.destroyed) continue;
+            const halfW = wall.width / 2;
+            const halfH = wall.height / 2;
+            const distX = Math.abs(monster.x - wall.x);
+            const distY = Math.abs(monster.y - wall.y);
+            
+            if (distX < halfW + monster.attackRange && distY < halfH + monster.attackRange) {
+                wall.health -= monster.damage * 0.5;
+                Effects.damageIndicator(wall.x, wall.y, Math.floor(monster.damage * 0.5), false);
+                if (wall.health <= 0) {
+                    wall.destroyed = true;
+                    Physics.unregister(wall);
+                    Effects.explosion(wall.x, wall.y, 40, '#888');
+                }
+                monster.lastAttack = currentTime;
+                return true;
+            }
+        }
+        return false;
+    },
+    
     update(currentTime) {
         // Update spawn indicators
         for (let i = this.spawnIndicators.length - 1; i >= 0; i--) { 
@@ -329,7 +355,11 @@ const Monsters = {
             Physics.clampToArena(monster);
             if (monster.isGunner && currentTime - monster.lastAttack >= monster.attackCooldown) { Projectiles.shootGunner(monster); monster.lastAttack = currentTime; }
             if (monster.isBoss && currentTime - monster.lastAttack >= monster.attackCooldown) { Boss.shootProjectiles(monster); monster.lastAttack = currentTime; }
-            this.checkMeleeAttack(monster, currentTime);
+            
+            // Check wall attack first, then melee
+            if (!this.checkWallAttack(monster, currentTime)) {
+                this.checkMeleeAttack(monster, currentTime);
+            }
         }
     },
     
