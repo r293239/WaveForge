@@ -192,5 +192,6 @@ const Overlays = {
         document.getElementById('gameOverOverlay').style.display = 'none';
         document.getElementById('waveCompleteOverlay').style.display = 'none';
         document.getElementById('difficultySelect').style.display = 'none';
+        document.getElementById('mapSelectionOverlay').style.display = 'none';
     }
 };
