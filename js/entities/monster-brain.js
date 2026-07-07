@@ -119,7 +119,7 @@ const MonsterBrain = {
         flock.center.y = cy / flock.members.length;
     },
     
-    // Get movement direction for a monster
+    // Get movement direction for a monster (with wall avoidance)
     getMovement(monster) {
         if (!Player.entity) return { x: 0, y: 0 };
         
@@ -131,6 +131,7 @@ const MonsterBrain = {
         
         let moveX = 0, moveY = 0;
         
+        // Calculate base movement direction based on role
         switch (monster.role) {
             case this.roles.CHASER:
                 moveX = player.x - monster.x;
@@ -199,6 +200,62 @@ const MonsterBrain = {
             moveY /= dist;
         }
         
+        // === WALL AVOIDANCE ===
+        // Check if moving straight would hit a wall
+        const testDist = 20; // Look ahead 20 pixels
+        const testX = monster.x + moveX * testDist;
+        const testY = monster.y + moveY * testDist;
+        
+        let blocked = false;
+        for (let wall of Arena.walls) {
+            if (wall.destroyed) continue;
+            const halfW = wall.width / 2;
+            const halfH = wall.height / 2;
+            if (testX >= wall.x - halfW && testX <= wall.x + halfW &&
+                testY >= wall.y - halfH && testY <= wall.y + halfH) {
+                blocked = true;
+                break;
+            }
+        }
+        
+        if (blocked) {
+            // Try to go around - check 4 directions
+            const alternatives = [
+                {x: 1, y: 0},   // right
+                {x: -1, y: 0},  // left
+                {x: 0, y: 1},   // down
+                {x: 0, y: -1}   // up
+            ];
+            
+            let found = false;
+            for (let alt of alternatives) {
+                const altX = monster.x + alt.x * testDist;
+                const altY = monster.y + alt.y * testDist;
+                let altBlocked = false;
+                for (let w of Arena.walls) {
+                    if (w.destroyed) continue;
+                    const hW = w.width / 2;
+                    const hH = w.height / 2;
+                    if (altX >= w.x - hW && altX <= w.x + hW &&
+                        altY >= w.y - hH && altY <= w.y + hH) {
+                        altBlocked = true;
+                        break;
+                    }
+                }
+                if (!altBlocked) {
+                    moveX = alt.x;
+                    moveY = alt.y;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                // If all directions are blocked, give up and stand still
+                moveX = 0;
+                moveY = 0;
+            }
+        }
+        
         // Avoid arena edges
         const bounds = Arena.getBounds();
         const edgeMargin = 40;
@@ -206,6 +263,13 @@ const MonsterBrain = {
         if (monster.x > bounds.maxX - edgeMargin) moveX -= 0.5;
         if (monster.y < bounds.minY + edgeMargin) moveY += 0.5;
         if (monster.y > bounds.maxY - edgeMargin) moveY -= 0.5;
+        
+        // Re-normalize after adjustments
+        const finalDist = Math.hypot(moveX, moveY);
+        if (finalDist > 0) {
+            moveX /= finalDist;
+            moveY /= finalDist;
+        }
         
         return { x: moveX, y: moveY };
     },
