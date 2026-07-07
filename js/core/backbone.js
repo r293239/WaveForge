@@ -22,6 +22,7 @@ const Game = {
     autoSaveInterval: null,
     purchasedItems: {}, 
     weaponUpgrades: {},
+    currentMap: 'open_arena', // Default map
     
     init() {
         this.canvas = document.getElementById('gameCanvas');
@@ -95,6 +96,9 @@ const Game = {
             
             console.log('Initializing Save...');
             Save.init();
+            
+            console.log('Initializing MapSelection...');
+            MapSelection.init();
             
             console.log('All systems initialized successfully');
             
@@ -180,6 +184,12 @@ const Game = {
     },
     
     startGame() {
+        // Show map selection first
+        MapSelection.show();
+    },
+    
+    // Start game after map selection
+    startGameWithMap() {
         this.state = GAME_STATE.WAVE; 
         this.wave = 1; 
         this.gold = CONFIG.PLAYER_START.gold; 
