@@ -3,28 +3,28 @@
 // ============================================
 
 const Game = {
-    state: GAME_STATE.START, 
-    wave: 1, 
-    gold: 50, 
-    kills: 0, 
-    refreshCount: 0, 
+    state: GAME_STATE.START,
+    wave: 1,
+    gold: 50,
+    kills: 0,
+    refreshCount: 0,
     refreshCost: 5,
-    waveActive: false, 
-    waveStartTime: 0, 
-    pendingSpawns: 0, 
-    sandboxMode: false, 
+    waveActive: false,
+    waveStartTime: 0,
+    pendingSpawns: 0,
+    sandboxMode: false,
     gameWon: false,
-    difficulty: DIFFICULTY.NORMAL, 
+    difficulty: DIFFICULTY.NORMAL,
     difficultyMultipliers: { ...CONFIG.DIFFICULTY.normal },
-    lastFrameTime: Date.now(), 
-    canvas: null, 
-    ctx: null, 
+    lastFrameTime: Date.now(),
+    canvas: null,
+    ctx: null,
     autoSaveInterval: null,
-    purchasedItems: {}, 
+    purchasedItems: {},
     weaponUpgrades: {},
     currentMap: 'open_arena',
     camera: Camera,
-    
+
     init() {
         this.canvas = document.getElementById('gameCanvas');
         if (!this.canvas) {
@@ -32,83 +32,83 @@ const Game = {
             return;
         }
         this.ctx = this.canvas.getContext('2d');
-        this.lastFrameTime = Date.now(); 
-        this.purchasedItems = {}; 
+        this.lastFrameTime = Date.now();
+        this.purchasedItems = {};
         this.weaponUpgrades = {};
-        
+
         try {
             console.log('Initializing Physics...');
-            Physics.init(); 
-            
+            Physics.init();
+
             console.log('Initializing Arena...');
-            Arena.init(); 
-            
+            Arena.init();
+
             console.log('Initializing Camera...');
             this.camera.init();
             this.camera.worldWidth = CONFIG.CANVAS_WIDTH * 2;
             this.camera.worldHeight = CONFIG.CANVAS_HEIGHT * 2;
-            
+
             console.log('Initializing Player...');
-            Player.init(); 
-            
+            Player.init();
+
             console.log('Initializing Monsters...');
-            Monsters.init(); 
-            
+            Monsters.init();
+
             console.log('Initializing MonsterBrain...');
             MonsterBrain.init();
-            
+
             console.log('Initializing Boss...');
-            Boss.init(); 
-            
+            Boss.init();
+
             console.log('Initializing Combat...');
-            Combat.init(); 
-            
+            Combat.init();
+
             console.log('Initializing Projectiles...');
-            Projectiles.init(); 
-            
+            Projectiles.init();
+
             console.log('Initializing Effects...');
-            Effects.init(); 
-            
+            Effects.init();
+
             console.log('Initializing Towers...');
             Towers.init();
-            
+
             console.log('Initializing Shop...');
-            Shop.init(); 
-            
+            Shop.init();
+
             console.log('Initializing Waves...');
-            Waves.init(); 
-            
+            Waves.init();
+
             console.log('Initializing Upgrades...');
-            Upgrades.init(); 
-            
+            Upgrades.init();
+
             console.log('Initializing Abilities...');
-            Abilities.init(); 
-            
+            Abilities.init();
+
             console.log('Initializing Messages...');
             Messages.init();
-            
+
             console.log('Initializing HUD...');
-            HUD.init(); 
-            
+            HUD.init();
+
             console.log('Initializing StatsPanel...');
-            StatsPanel.init(); 
-            
+            StatsPanel.init();
+
             console.log('Initializing Overlays...');
-            Overlays.init(); 
-            
+            Overlays.init();
+
             console.log('Initializing Joystick...');
-            Joystick.init(); 
-            
+            Joystick.init();
+
             console.log('Initializing Save...');
             Save.init();
-            
+
             console.log('Initializing MapSelection...');
             MapSelection.init();
-            
+
             console.log('All systems initialized successfully');
-            
-            this.setupKeyboard(); 
-            Overlays.showStart(); 
+
+            this.setupKeyboard();
+            Overlays.showStart();
             this.gameLoop();
         } catch (e) {
             console.error('Game initialization error details:');
@@ -121,188 +121,196 @@ const Game = {
             document.body.appendChild(errorMsg);
         }
     },
-    
+
     setupKeyboard() {
-        document.addEventListener('keydown', (e) => { 
-            const key = e.key.toLowerCase(); 
-            if (key === ' ' && (this.state === GAME_STATE.SHOP || this.state === GAME_STATE.WIN)) { 
-                e.preventDefault(); 
-                this.startNextWave(); 
-            } 
-            if (key === 's' && e.ctrlKey) { 
-                e.preventDefault(); 
-                Save.saveGame(); 
-            } 
-            if (key === 'l' && e.ctrlKey) { 
-                e.preventDefault(); 
-                Save.loadGame(); 
-            } 
+        document.addEventListener('keydown', (e) => {
+            const key = e.key.toLowerCase();
+            if (key === ' ' && (this.state === GAME_STATE.SHOP || this.state === GAME_STATE.WIN)) {
+                e.preventDefault();
+                this.startNextWave();
+            }
+            if (key === 's' && e.ctrlKey) {
+                e.preventDefault();
+                Save.saveGame();
+            }
+            if (key === 'l' && e.ctrlKey) {
+                e.preventDefault();
+                Save.loadGame();
+            }
         });
     },
-    
+
     gameLoop() {
         try {
-            const currentTime = Date.now(), deltaTime = currentTime - this.lastFrameTime; 
+            const currentTime = Date.now(),
+                deltaTime = currentTime - this.lastFrameTime;
             this.lastFrameTime = currentTime;
-            
-            if (this.state === GAME_STATE.WAVE) { 
-                Player.update(deltaTime); 
-                Monsters.update(currentTime); 
-                MonsterBrain.update(currentTime); 
-                Boss.update(currentTime); 
-                Combat.updateWeapons(currentTime); 
-                Projectiles.update(currentTime); 
-                Combat.updateMeleeAttacks(currentTime); 
-                Effects.update(currentTime); 
-                Towers.update(currentTime); 
-                Monsters.updateStatusEffects(currentTime); 
-                Waves.checkWaveEnd(); 
-                Physics.resolveMonsterCollisions(); 
-                Physics.resolvePlayerMonsterCollisions(); 
+
+            if (this.state === GAME_STATE.WAVE) {
+                Player.update(deltaTime);
+                Monsters.update(currentTime);
+                MonsterBrain.update(currentTime);
+                Boss.update(currentTime);
+                Combat.updateWeapons(currentTime);
+                Projectiles.update(currentTime);
+                Combat.updateMeleeAttacks(currentTime);
+                Effects.update(currentTime);
+                Towers.update(currentTime);
+                Monsters.updateStatusEffects(currentTime);
+                Waves.checkWaveEnd();
+                Physics.resolveMonsterCollisions();
+                Physics.resolvePlayerMonsterCollisions();
             }
-            
-            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height); 
-            
-            // Follow player with camera
+
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
             if (Player.entity) {
                 this.camera.follow(Player.entity);
             }
-            
-            // Apply camera transform
+
             this.camera.apply(this.ctx);
-            
-            // Draw everything in world space
-            Arena.draw(); 
-            Effects.drawGround(); 
-            Waves.drawIndicators(); 
-            Towers.draw(); 
-            Monsters.draw(); 
-            Projectiles.draw(); 
-            Combat.drawMeleeAttacks(); 
-            Boss.drawAttacks(); 
-            Effects.draw(); 
-            Player.draw(); 
-            
-            // Restore camera
+            Arena.draw();
+            Effects.drawGround();
+            Waves.drawIndicators();
+            Towers.draw();
+            Monsters.draw();
+            Projectiles.draw();
+            Combat.drawMeleeAttacks();
+            Boss.drawAttacks();
+            Effects.draw();
+            Player.draw();
             this.camera.restore(this.ctx);
-            
-            // Draw UI on top (not affected by camera)
+
             HUD.updateCooldowns();
         } catch (e) {
             console.error('Game loop error:', e);
         }
-        
+
         requestAnimationFrame(() => this.gameLoop());
     },
-    
-    setDifficulty(mode) { 
-        this.difficulty = mode; 
-        this.sandboxMode = false; 
-        this.gameWon = false; 
-        this.difficultyMultipliers = { ...CONFIG.DIFFICULTY[mode] }; 
+
+    setDifficulty(mode) {
+        this.difficulty = mode;
+        this.sandboxMode = false;
+        this.gameWon = false;
+        this.difficultyMultipliers = { ...CONFIG.DIFFICULTY[mode] };
     },
-    
+
     startGame() {
+        console.log('🟢 startGame() called – showing map selection');
         MapSelection.show();
     },
-    
+
     startGameWithMap() {
-        console.log('🟢 startGameWithMap called!');
-        this.state = GAME_STATE.WAVE; 
-        this.wave = 1; 
-        this.gold = CONFIG.PLAYER_START.gold; 
+        console.log('🟢 startGameWithMap() called – starting game!');
+        
+        // Reset everything
+        this.state = GAME_STATE.WAVE;
+        this.wave = 1;
+        this.gold = CONFIG.PLAYER_START.gold;
         this.kills = 0;
-        this.refreshCount = 0; 
-        this.refreshCost = CONFIG.SHOP_REFRESH_BASE_COST; 
+        this.refreshCount = 0;
+        this.refreshCost = CONFIG.SHOP_REFRESH_BASE_COST;
         this.waveActive = true;
-        this.pendingSpawns = 0; 
-        this.sandboxMode = false; 
+        this.pendingSpawns = 0;
+        this.sandboxMode = false;
         this.gameWon = false;
-        this.purchasedItems = {}; 
+        this.purchasedItems = {};
         this.weaponUpgrades = {};
-        
-        Player.reset(); 
-        Monsters.reset(); 
-        Boss.reset(); 
-        Projectiles.reset(); 
-        Towers.reset(); 
-        Effects.reset(); 
+
+        Player.reset();
+        Monsters.reset();
+        Boss.reset();
+        Projectiles.reset();
+        Towers.reset();
+        Effects.reset();
         Abilities.reset();
-        
-        Player.addWeapon(WEAPON_DATA.find(w => w.id === 'handgun'));
-        Shop.generateItems(); 
-        Waves.startWave(); 
+
+        // Give player starting weapon
+        const handgunData = WEAPON_DATA.find(w => w.id === 'handgun');
+        if (handgunData) {
+            Player.addWeapon(handgunData);
+            console.log('✅ Handgun added');
+        } else {
+            console.error('❌ Handgun data not found!');
+        }
+
+        Shop.generateItems();
+        Waves.startWave();
         Abilities.resetCooldowns();
-        
+
         if (this.autoSaveInterval) clearInterval(this.autoSaveInterval);
         this.autoSaveInterval = setInterval(() => Save.saveGame(), CONFIG.AUTO_SAVE_INTERVAL);
-        HUD.updateAll(); 
+
+        HUD.updateAll();
         Overlays.hideAll();
-        console.log('✅ Game started!');
+
+        console.log('✅ Game started successfully!');
     },
-    
+
     startNextWave() {
         if (this.state !== GAME_STATE.SHOP && this.state !== GAME_STATE.WIN) return;
-        this.state = GAME_STATE.WAVE; 
-        this.waveActive = true; 
-        Waves.startWave(); 
-        Abilities.resetCooldowns(); 
+        this.state = GAME_STATE.WAVE;
+        this.waveActive = true;
+        Waves.startWave();
+        Abilities.resetCooldowns();
         HUD.hideWaveButton();
     },
-    
+
     waveComplete() {
-        if (this.wave === 40 && !this.sandboxMode) { 
-            this.gameWon = true; 
-            this.state = GAME_STATE.WIN; 
-            this.waveActive = false; 
-            Save.clearSave(); 
-            Overlays.showWin(); 
-            return; 
+        if (this.wave === 40 && !this.sandboxMode) {
+            this.gameWon = true;
+            this.state = GAME_STATE.WIN;
+            this.waveActive = false;
+            Save.clearSave();
+            Overlays.showWin();
+            return;
         }
         if (this.sandboxMode && this.wave === 40) Messages.show('Sandbox Mode Active!', 4000);
-        this.state = GAME_STATE.STAT_SELECT; 
+        this.state = GAME_STATE.STAT_SELECT;
         this.waveActive = false;
         this.gold += Math.floor(Waves.getWaveConfig(this.wave).goldReward * (1 + Player.goldMultiplier));
-        Player.weapons.forEach(w => { 
-            if (w.usesAmmo && !w.isThrowable) { 
-                w.currentAmmo = w.magazineSize; 
-                w.isReloading = false; 
-            } 
+        Player.weapons.forEach(w => {
+            if (w.usesAmmo && !w.isThrowable) {
+                w.currentAmmo = w.magazineSize;
+                w.isReloading = false;
+            }
         });
         Save.saveGame();
-        Upgrades.showSelection(); 
+        Upgrades.showSelection();
         HUD.updateAll();
     },
-    
+
     gameOver() {
-        this.state = GAME_STATE.GAMEOVER; 
+        this.state = GAME_STATE.GAMEOVER;
         this.waveActive = false;
-        if (this.autoSaveInterval) { 
-            clearInterval(this.autoSaveInterval); 
-            this.autoSaveInterval = null; 
+        if (this.autoSaveInterval) {
+            clearInterval(this.autoSaveInterval);
+            this.autoSaveInterval = null;
         }
-        Player.inSlowField = false; 
-        Player.slowFieldTicks = 0; 
+        Player.inSlowField = false;
+        Player.slowFieldTicks = 0;
         Player.speed = Player.baseSpeed * Player.speedMultiplier;
         Save.clearSave();
-        if (Player.guardianAngel && !Player.guardianAngelUsed) { 
-            Player.guardianAngelUsed = true; 
-            Player.health = Math.max(1, Math.floor(Player.maxHealth * 0.5)); 
-            this.state = GAME_STATE.WAVE; 
-            this.waveActive = true; 
-            Messages.show('GUARDIAN ANGEL SAVED YOU!'); 
-            Effects.guardianAngel(Player.entity.x, Player.entity.y); 
-            HUD.updateStats(); 
-            return; 
+        if (Player.guardianAngel && !Player.guardianAngelUsed) {
+            Player.guardianAngelUsed = true;
+            Player.health = Math.max(1, Math.floor(Player.maxHealth * 0.5));
+            this.state = GAME_STATE.WAVE;
+            this.waveActive = true;
+            Messages.show('GUARDIAN ANGEL SAVED YOU!');
+            Effects.guardianAngel(Player.entity.x, Player.entity.y);
+            HUD.updateStats();
+            return;
         }
         Overlays.showGameOver();
     },
-    
-    addKill() { this.kills++; HUD.updateStats(); }
+
+    addKill() { this.kills++;
+        HUD.updateStats(); }
 };
 
-if (document.readyState === 'complete' || document.readyState === 'interactive') { 
-    setTimeout(() => Game.init(), 100); 
-} else { 
-    document.addEventListener('DOMContentLoaded', () => Game.init()); 
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    setTimeout(() => Game.init(), 100);
+} else {
+    document.addEventListener('DOMContentLoaded', () => Game.init());
 }
