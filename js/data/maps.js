@@ -3,152 +3,99 @@
 // ============================================
 
 const MAP_DEFINITIONS = {
-    // === OPEN ARENA ===
     'open_arena': {
         id: 'open_arena',
         name: 'Open Arena',
         icon: '🏟️',
         description: 'No walls, pure combat. Perfect for testing builds.',
         difficulty: 'easy',
-        walls: [],
-        bossModifiers: {},
-        spawnModifiers: {}
+        walls: []
     },
-    
-    // === MAZE ===
     'maze': {
         id: 'maze',
         name: 'The Maze',
         icon: '🧩',
         description: 'A confusing maze of walls. Enemies can get lost too.',
         difficulty: 'medium',
-        walls: [],
-        bossModifiers: {},
-        spawnModifiers: {}
+        walls: []
     },
-    
-    // === CROSSROADS ===
     'crossroads': {
         id: 'crossroads',
         name: 'Crossroads',
         icon: '✚',
         description: 'Four corridors meeting in the center. Enemies come from all sides.',
         difficulty: 'medium',
-        walls: [],
-        bossModifiers: {},
-        spawnModifiers: {}
+        walls: []
     },
-    
-    // === SPIRAL ===
     'spiral': {
         id: 'spiral',
         name: 'The Spiral',
         icon: '🌀',
         description: 'A spiral path to the center. Watch your back!',
         difficulty: 'hard',
-        walls: [],
-        bossModifiers: {},
-        spawnModifiers: {}
+        walls: []
     },
-    
-    // === FORTRESS ===
     'fortress': {
         id: 'fortress',
         name: 'Fortress',
         icon: '🏰',
         description: 'A castle with narrow corridors. Enemies swarm through the gates.',
         difficulty: 'hard',
-        walls: [],
-        bossModifiers: {},
-        spawnModifiers: {}
+        walls: []
     },
-    
-    // === RING ===
     'ring': {
         id: 'ring',
         name: 'The Ring',
         icon: '⭕',
         description: 'A circular arena with a ring of walls. Enemies spawn from the outer ring.',
         difficulty: 'medium',
-        walls: [],
-        bossModifiers: {},
-        spawnModifiers: {}
+        walls: []
     },
-    
-    // === CHAOS ===
     'chaos': {
         id: 'chaos',
         name: 'Chaos',
         icon: '🌪️',
         description: 'Random walls every wave. No two waves are the same!',
         difficulty: 'extreme',
-        walls: [],
-        bossModifiers: {},
-        spawnModifiers: {}
+        walls: []
     },
-    
-    // === TOWER ===
     'tower': {
         id: 'tower',
         name: 'The Tower',
         icon: '🗼',
         description: 'A tower with multiple floors. Enemies climb up to reach you.',
         difficulty: 'extreme',
-        walls: [],
-        bossModifiers: {},
-        spawnModifiers: {}
+        walls: []
     }
 };
 
-// === MAP GENERATORS ===
 const MapGenerators = {
-    // Generate walls for each map type
     generateMap(mapId) {
-        const map = MAP_DEFINITIONS[mapId];
-        if (!map) return [];
-        
         switch(mapId) {
-            case 'open_arena':
-                return this.generateOpenArena();
-            case 'maze':
-                return this.generateMaze();
-            case 'crossroads':
-                return this.generateCrossroads();
-            case 'spiral':
-                return this.generateSpiral();
-            case 'fortress':
-                return this.generateFortress();
-            case 'ring':
-                return this.generateRing();
-            case 'chaos':
-                return this.generateChaos();
-            case 'tower':
-                return this.generateTower();
-            default:
-                return this.generateOpenArena();
+            case 'open_arena': return this.generateOpenArena();
+            case 'maze': return this.generateMaze();
+            case 'crossroads': return this.generateCrossroads();
+            case 'spiral': return this.generateSpiral();
+            case 'fortress': return this.generateFortress();
+            case 'ring': return this.generateRing();
+            case 'chaos': return this.generateChaos();
+            case 'tower': return this.generateTower();
+            default: return this.generateOpenArena();
         }
     },
     
-    // Open Arena - no walls
-    generateOpenArena() {
-        return [];
-    },
+    generateOpenArena() { return []; },
     
-    // Maze - guaranteed paths, no trap boxes
     generateMaze() {
         const walls = [];
         const cellSize = 60;
-        const cols = Math.floor((CONFIG.CANVAS_WIDTH - 40) / cellSize);
-        const rows = Math.floor((CONFIG.CANVAS_HEIGHT - 40) / cellSize);
+        const cols = Math.floor((CONFIG.CANVAS_WIDTH * 2 - 40) / cellSize);
+        const rows = Math.floor((CONFIG.CANVAS_HEIGHT * 2 - 40) / cellSize);
         
-        // Simple grid with guaranteed paths
         for (let y = 0; y < rows; y++) {
             for (let x = 0; x < cols; x++) {
-                // Keep border cells open
                 if (y === 0 || y === rows-1 || x === 0 || x === cols-1) continue;
-                // Keep every other cell open (grid pattern)
                 if (x % 2 === 0 && y % 2 === 0) continue;
-                // Random walls with lower density
                 if (Math.random() < 0.35) {
                     walls.push({
                         x: 20 + x * cellSize + cellSize/2,
@@ -162,13 +109,11 @@ const MapGenerators = {
             }
         }
         
-        // Add some additional random walls but keep them small and spaced
         const numWalls = 3 + Math.floor(Math.random() * 6);
         for (let i = 0; i < numWalls; i++) {
-            const x = 60 + Math.random() * (CONFIG.CANVAS_WIDTH - 120);
-            const y = 60 + Math.random() * (CONFIG.CANVAS_HEIGHT - 120);
-            // Don't block center
-            if (Math.hypot(x - CONFIG.CANVAS_WIDTH/2, y - CONFIG.CANVAS_HEIGHT/2) < 100) continue;
+            const x = 60 + Math.random() * (CONFIG.CANVAS_WIDTH * 2 - 120);
+            const y = 60 + Math.random() * (CONFIG.CANVAS_HEIGHT * 2 - 120);
+            if (Math.hypot(x - CONFIG.CANVAS_WIDTH, y - CONFIG.CANVAS_HEIGHT) < 100) continue;
             walls.push({
                 x, y,
                 width: 30 + Math.random() * 30,
@@ -177,20 +122,16 @@ const MapGenerators = {
                 health: 80
             });
         }
-        
         return walls;
     },
     
-    // Crossroads - four corridors meeting in center
     generateCrossroads() {
         const walls = [];
-        const centerX = CONFIG.CANVAS_WIDTH / 2;
-        const centerY = CONFIG.CANVAS_HEIGHT / 2;
+        const centerX = CONFIG.CANVAS_WIDTH;
+        const centerY = CONFIG.CANVAS_HEIGHT;
         const corridorWidth = 80;
         const wallThickness = 20;
         
-        // Four quadrants with corridors - leave gaps for monsters
-        // Top-left quadrant walls
         walls.push({
             x: centerX - corridorWidth/2 - wallThickness/2,
             y: centerY - corridorWidth/2 - wallThickness/2,
@@ -199,8 +140,6 @@ const MapGenerators = {
             color: '#2a2a4a',
             health: 100
         });
-        
-        // Top-right quadrant walls
         walls.push({
             x: centerX + corridorWidth/2 + wallThickness/2,
             y: centerY - corridorWidth/2 - wallThickness/2,
@@ -209,8 +148,6 @@ const MapGenerators = {
             color: '#2a2a4a',
             health: 100
         });
-        
-        // Bottom-left quadrant walls
         walls.push({
             x: centerX - corridorWidth/2 - wallThickness/2,
             y: centerY + corridorWidth/2 + wallThickness/2,
@@ -219,8 +156,6 @@ const MapGenerators = {
             color: '#2a2a4a',
             health: 100
         });
-        
-        // Bottom-right quadrant walls
         walls.push({
             x: centerX + corridorWidth/2 + wallThickness/2,
             y: centerY + corridorWidth/2 + wallThickness/2,
@@ -229,32 +164,25 @@ const MapGenerators = {
             color: '#2a2a4a',
             health: 100
         });
-        
         return walls;
     },
     
-    // Spiral - spiral path to center
     generateSpiral() {
         const walls = [];
-        const centerX = CONFIG.CANVAS_WIDTH / 2;
-        const centerY = CONFIG.CANVAS_HEIGHT / 2;
+        const centerX = CONFIG.CANVAS_WIDTH;
+        const centerY = CONFIG.CANVAS_HEIGHT;
         const segments = 20;
         const wallThickness = 15;
-        const gapSize = 30; // Gaps between spiral segments
         
         for (let i = 0; i < segments; i++) {
+            if (i % 3 === 0) continue;
             const t = i / segments;
             const angle = t * Math.PI * 6;
             const radius = 50 + t * 250;
             const x = centerX + Math.cos(angle) * radius;
             const y = centerY + Math.sin(angle) * radius;
-            
-            // Leave gaps for monsters to pass
-            if (i % 3 === 0) continue;
-            
             walls.push({
-                x: x,
-                y: y,
+                x, y,
                 width: wallThickness,
                 height: 25 + t * 30,
                 color: '#2a2a4a',
@@ -262,135 +190,118 @@ const MapGenerators = {
                 angle: angle + Math.PI/2
             });
         }
-        
         return walls;
     },
     
-    // Fortress - castle with narrow corridors
     generateFortress() {
         const walls = [];
         const wallThickness = 15;
         const margin = 30;
         const gateWidth = 80;
+        const centerX = CONFIG.CANVAS_WIDTH;
+        const centerY = CONFIG.CANVAS_HEIGHT;
         
-        // Outer walls with gaps for gates
-        // Top wall
         walls.push({
-            x: CONFIG.CANVAS_WIDTH/2,
+            x: centerX,
             y: margin,
-            width: CONFIG.CANVAS_WIDTH - 2*margin - gateWidth/2,
+            width: CONFIG.CANVAS_WIDTH * 2 - 2*margin - gateWidth/2,
             height: wallThickness,
             color: '#2a2a4a',
             health: 200
         });
         walls.push({
-            x: CONFIG.CANVAS_WIDTH/2 + gateWidth/2,
+            x: centerX + gateWidth/2,
             y: margin,
-            width: CONFIG.CANVAS_WIDTH - 2*margin - gateWidth/2,
-            height: wallThickness,
-            color: '#2a2a4a',
-            health: 200
-        });
-        
-        // Bottom wall
-        walls.push({
-            x: CONFIG.CANVAS_WIDTH/2,
-            y: CONFIG.CANVAS_HEIGHT - margin,
-            width: CONFIG.CANVAS_WIDTH - 2*margin - gateWidth/2,
+            width: CONFIG.CANVAS_WIDTH * 2 - 2*margin - gateWidth/2,
             height: wallThickness,
             color: '#2a2a4a',
             health: 200
         });
         walls.push({
-            x: CONFIG.CANVAS_WIDTH/2 + gateWidth/2,
-            y: CONFIG.CANVAS_HEIGHT - margin,
-            width: CONFIG.CANVAS_WIDTH - 2*margin - gateWidth/2,
+            x: centerX,
+            y: CONFIG.CANVAS_HEIGHT * 2 - margin,
+            width: CONFIG.CANVAS_WIDTH * 2 - 2*margin - gateWidth/2,
             height: wallThickness,
             color: '#2a2a4a',
             health: 200
         });
-        
-        // Left wall (with gate)
+        walls.push({
+            x: centerX + gateWidth/2,
+            y: CONFIG.CANVAS_HEIGHT * 2 - margin,
+            width: CONFIG.CANVAS_WIDTH * 2 - 2*margin - gateWidth/2,
+            height: wallThickness,
+            color: '#2a2a4a',
+            health: 200
+        });
         walls.push({
             x: margin,
-            y: CONFIG.CANVAS_HEIGHT/2 - gateWidth/2,
+            y: centerY - gateWidth/2,
             width: wallThickness,
-            height: CONFIG.CANVAS_HEIGHT/2 - gateWidth/2 - margin,
+            height: centerY - gateWidth/2 - margin,
             color: '#2a2a4a',
             health: 100
         });
         walls.push({
             x: margin,
-            y: CONFIG.CANVAS_HEIGHT/2 + gateWidth/2,
+            y: centerY + gateWidth/2,
             width: wallThickness,
-            height: CONFIG.CANVAS_HEIGHT/2 - gateWidth/2 - margin,
-            color: '#2a2a4a',
-            health: 100
-        });
-        
-        // Right wall (with gate)
-        walls.push({
-            x: CONFIG.CANVAS_WIDTH - margin,
-            y: CONFIG.CANVAS_HEIGHT/2 - gateWidth/2,
-            width: wallThickness,
-            height: CONFIG.CANVAS_HEIGHT/2 - gateWidth/2 - margin,
+            height: CONFIG.CANVAS_HEIGHT * 2 - centerY - gateWidth/2 - margin,
             color: '#2a2a4a',
             health: 100
         });
         walls.push({
-            x: CONFIG.CANVAS_WIDTH - margin,
-            y: CONFIG.CANVAS_HEIGHT/2 + gateWidth/2,
+            x: CONFIG.CANVAS_WIDTH * 2 - margin,
+            y: centerY - gateWidth/2,
             width: wallThickness,
-            height: CONFIG.CANVAS_HEIGHT/2 - gateWidth/2 - margin,
+            height: centerY - gateWidth/2 - margin,
             color: '#2a2a4a',
             health: 100
         });
-        
-        // Inner walls (corridors) with gaps
+        walls.push({
+            x: CONFIG.CANVAS_WIDTH * 2 - margin,
+            y: centerY + gateWidth/2,
+            width: wallThickness,
+            height: CONFIG.CANVAS_HEIGHT * 2 - centerY - gateWidth/2 - margin,
+            color: '#2a2a4a',
+            health: 100
+        });
         const innerSize = 120;
         walls.push({
-            x: CONFIG.CANVAS_WIDTH/2 - innerSize/2,
-            y: CONFIG.CANVAS_HEIGHT/2 - 10,
+            x: centerX - innerSize/2,
+            y: centerY - 10,
             width: innerSize,
             height: wallThickness,
             color: '#3a3a5a',
             health: 100
         });
         walls.push({
-            x: CONFIG.CANVAS_WIDTH/2 - innerSize/2,
-            y: CONFIG.CANVAS_HEIGHT/2 + 10,
+            x: centerX - innerSize/2,
+            y: centerY + 10,
             width: innerSize,
             height: wallThickness,
             color: '#3a3a5a',
             health: 100
         });
-        
         return walls;
     },
     
-    // Ring - circular arena with ring of walls
     generateRing() {
         const walls = [];
-        const centerX = CONFIG.CANVAS_WIDTH / 2;
-        const centerY = CONFIG.CANVAS_HEIGHT / 2;
+        const centerX = CONFIG.CANVAS_WIDTH;
+        const centerY = CONFIG.CANVAS_HEIGHT;
         const innerRadius = 150;
         const outerRadius = 220;
         const segments = 24;
         const wallThickness = 20;
-        const gapSize = 40; // Gaps between ring segments
         
         for (let i = 0; i < segments; i++) {
-            // Leave gaps for monsters to pass
             if (i % 4 === 0) continue;
-            
             const angle = (i / segments) * Math.PI * 2;
             const radius = innerRadius + (outerRadius - innerRadius) / 2;
             const x = centerX + Math.cos(angle) * radius;
             const y = centerY + Math.sin(angle) * radius;
-            
             walls.push({
-                x: x,
-                y: y,
+                x, y,
                 width: wallThickness,
                 height: wallThickness,
                 color: '#2a2a4a',
@@ -398,18 +309,14 @@ const MapGenerators = {
                 angle: angle
             });
         }
-        
-        // Add some inner ring walls
         for (let i = 0; i < 12; i++) {
             if (i % 3 === 0) continue;
             const angle = (i / 12) * Math.PI * 2;
             const radius = 80;
             const x = centerX + Math.cos(angle) * radius;
             const y = centerY + Math.sin(angle) * radius;
-            
             walls.push({
-                x: x,
-                y: y,
+                x, y,
                 width: 15,
                 height: 15,
                 color: '#3a3a5a',
@@ -417,34 +324,25 @@ const MapGenerators = {
                 angle: angle
             });
         }
-        
         return walls;
     },
     
-    // Chaos - random walls every wave
     generateChaos() {
         const walls = [];
         const numWalls = 6 + Math.floor(Math.random() * 8);
-        
         for (let i = 0; i < numWalls; i++) {
             let x, y, valid = false;
             for (let attempts = 0; attempts < 20; attempts++) {
-                x = 80 + Math.random() * (CONFIG.CANVAS_WIDTH - 160);
-                y = 80 + Math.random() * (CONFIG.CANVAS_HEIGHT - 160);
-                
-                // Don't block center too much
-                if (Math.hypot(x - CONFIG.CANVAS_WIDTH/2, y - CONFIG.CANVAS_HEIGHT/2) < 120) continue;
-                
-                // Don't block corners (keep spawn areas open)
+                x = 80 + Math.random() * (CONFIG.CANVAS_WIDTH * 2 - 160);
+                y = 80 + Math.random() * (CONFIG.CANVAS_HEIGHT * 2 - 160);
+                if (Math.hypot(x - CONFIG.CANVAS_WIDTH, y - CONFIG.CANVAS_HEIGHT) < 120) continue;
                 if (x < 100 && y < 100) continue;
-                if (x > CONFIG.CANVAS_WIDTH - 100 && y < 100) continue;
-                if (x < 100 && y > CONFIG.CANVAS_HEIGHT - 100) continue;
-                if (x > CONFIG.CANVAS_WIDTH - 100 && y > CONFIG.CANVAS_HEIGHT - 100) continue;
-                
+                if (x > CONFIG.CANVAS_WIDTH * 2 - 100 && y < 100) continue;
+                if (x < 100 && y > CONFIG.CANVAS_HEIGHT * 2 - 100) continue;
+                if (x > CONFIG.CANVAS_WIDTH * 2 - 100 && y > CONFIG.CANVAS_HEIGHT * 2 - 100) continue;
                 valid = true;
                 break;
             }
-            
             if (valid) {
                 walls.push({
                     x, y,
@@ -458,20 +356,17 @@ const MapGenerators = {
         return walls;
     },
     
-    // Tower - multiple floors with stairs
     generateTower() {
         const walls = [];
-        const centerX = CONFIG.CANVAS_WIDTH / 2;
-        const centerY = CONFIG.CANVAS_HEIGHT / 2;
+        const centerX = CONFIG.CANVAS_WIDTH;
+        const centerY = CONFIG.CANVAS_HEIGHT;
         const floors = 4;
-        const floorHeight = CONFIG.CANVAS_HEIGHT / floors;
+        const floorHeight = CONFIG.CANVAS_HEIGHT * 2 / floors;
         const wallThickness = 15;
         
         for (let i = 0; i < floors; i++) {
             const y = i * floorHeight + floorHeight/2;
-            const width = CONFIG.CANVAS_WIDTH * (1 - i * 0.15);
-            
-            // Floor walls with gaps
+            const width = CONFIG.CANVAS_WIDTH * 2 * (1 - i * 0.15);
             const gapSize = 60 + i * 10;
             walls.push({
                 x: centerX - width/2 - 10,
@@ -490,8 +385,6 @@ const MapGenerators = {
                 health: 150 - i * 20
             });
         }
-        
-        // Spiral stairs with gaps
         const stairSegments = 16;
         for (let i = 0; i < stairSegments; i++) {
             if (i % 3 === 0) continue;
@@ -500,27 +393,22 @@ const MapGenerators = {
             const radius = 50 + t * 150;
             const x = centerX + Math.cos(angle) * radius;
             const y = centerY + Math.sin(angle) * radius;
-            
             walls.push({
-                x: x,
-                y: y,
+                x, y,
                 width: 10,
                 height: 10,
                 color: '#3a3a5a',
                 health: 50
             });
         }
-        
         return walls;
     }
 };
 
-// === MAP SELECTION UI ===
 const MapSelection = {
     selectedMap: 'open_arena',
     
     init() {
-        // Create the overlay if it doesn't exist
         if (!document.getElementById('mapSelectionOverlay')) {
             const overlay = document.createElement('div');
             overlay.id = 'mapSelectionOverlay';
@@ -532,12 +420,8 @@ const MapSelection = {
     
     show() {
         const overlay = document.getElementById('mapSelectionOverlay');
-        if (!overlay) {
-            console.error('MapSelection overlay not found!');
-            return;
-        }
+        if (!overlay) return;
         
-        // Build the HTML
         overlay.innerHTML = `
             <div class="overlay-content" style="max-width: 900px; background: rgba(30,30,60,0.95); padding: 40px; border-radius: 20px; border: 3px solid #ffd700;">
                 <h2 class="overlay-title" style="font-size: 3rem; color: #ffd700; margin-bottom: 20px;">🗺️ Select Your Arena</h2>
@@ -553,7 +437,6 @@ const MapSelection = {
             </div>
         `;
         
-        // Add click handlers for map buttons
         overlay.querySelectorAll('.map-btn').forEach(btn => {
             btn.addEventListener('click', () => this.selectMap(btn.dataset.mapId));
             btn.addEventListener('touchstart', (e) => {
@@ -562,7 +445,6 @@ const MapSelection = {
             });
         });
         
-        // Confirm button
         const confirmBtn = document.getElementById('confirmMapBtn');
         if (confirmBtn) {
             confirmBtn.addEventListener('click', () => this.confirmMap());
@@ -572,7 +454,6 @@ const MapSelection = {
             });
         }
         
-        // Show the overlay
         overlay.style.display = 'flex';
     },
     
@@ -617,12 +498,9 @@ const MapSelection = {
     
     confirmMap() {
         Game.currentMap = this.selectedMap;
-        const overlay = document.getElementById('mapSelectionOverlay');
-        overlay.style.display = 'none';
-        
+        document.getElementById('mapSelectionOverlay').style.display = 'none';
         const walls = MapGenerators.generateMap(this.selectedMap);
         Arena.setWalls(walls);
-        
         Game.startGameWithMap();
     }
 };
