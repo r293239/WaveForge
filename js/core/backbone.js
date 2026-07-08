@@ -22,7 +22,8 @@ const Game = {
     autoSaveInterval: null,
     purchasedItems: {}, 
     weaponUpgrades: {},
-    currentMap: 'open_arena', // Default map
+    currentMap: 'open_arena',
+    camera: Camera,
     
     init() {
         this.canvas = document.getElementById('gameCanvas');
@@ -36,12 +37,16 @@ const Game = {
         this.weaponUpgrades = {};
         
         try {
-            // Initialize systems in correct order
             console.log('Initializing Physics...');
             Physics.init(); 
             
             console.log('Initializing Arena...');
             Arena.init(); 
+            
+            console.log('Initializing Camera...');
+            this.camera.init();
+            this.camera.worldWidth = CONFIG.CANVAS_WIDTH * 2;
+            this.camera.worldHeight = CONFIG.CANVAS_HEIGHT * 2;
             
             console.log('Initializing Player...');
             Player.init(); 
@@ -110,7 +115,6 @@ const Game = {
             console.error('Error name:', e.name);
             console.error('Error message:', e.message);
             console.error('Error stack:', e.stack);
-            // Try to show error in the UI
             const errorMsg = document.createElement('div');
             errorMsg.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#ff0000;color:#fff;padding:20px;border-radius:10px;z-index:9999;max-width:500px;text-align:center;font-size:16px;';
             errorMsg.innerHTML = `<h2>Error Starting Game</h2><p>${e.message || 'Unknown error'}</p><p style="font-size:12px;color:#ffcccc;">Check console for details</p>`;
@@ -158,6 +162,16 @@ const Game = {
             }
             
             this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height); 
+            
+            // Follow player with camera
+            if (Player.entity) {
+                this.camera.follow(Player.entity);
+            }
+            
+            // Apply camera transform
+            this.camera.apply(this.ctx);
+            
+            // Draw everything in world space
             Arena.draw(); 
             Effects.drawGround(); 
             Waves.drawIndicators(); 
@@ -168,6 +182,11 @@ const Game = {
             Boss.drawAttacks(); 
             Effects.draw(); 
             Player.draw(); 
+            
+            // Restore camera
+            this.camera.restore(this.ctx);
+            
+            // Draw UI on top (not affected by camera)
             HUD.updateCooldowns();
         } catch (e) {
             console.error('Game loop error:', e);
@@ -184,12 +203,11 @@ const Game = {
     },
     
     startGame() {
-        // Show map selection first
         MapSelection.show();
     },
     
-    // Start game after map selection
     startGameWithMap() {
+        console.log('🟢 startGameWithMap called!');
         this.state = GAME_STATE.WAVE; 
         this.wave = 1; 
         this.gold = CONFIG.PLAYER_START.gold; 
@@ -220,6 +238,7 @@ const Game = {
         this.autoSaveInterval = setInterval(() => Save.saveGame(), CONFIG.AUTO_SAVE_INTERVAL);
         HUD.updateAll(); 
         Overlays.hideAll();
+        console.log('✅ Game started!');
     },
     
     startNextWave() {
@@ -282,7 +301,6 @@ const Game = {
     addKill() { this.kills++; HUD.updateStats(); }
 };
 
-// Wait for DOM to be ready
 if (document.readyState === 'complete' || document.readyState === 'interactive') { 
     setTimeout(() => Game.init(), 100); 
 } else { 
