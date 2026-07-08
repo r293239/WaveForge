@@ -87,7 +87,9 @@ const Monsters = {
             bleeding: false, bleedDmg: 0, bleedEnd: 0,
             lastPoisonTick: 0, lastBleedTick: 0, lastFireTick: 0,
             targetX: x, targetY: y, flockId: null, role: null,
-            spawnClusterId: null
+            spawnClusterId: null,
+            // NEW: prevent chain reactions
+            hasExploded: false
         };
         Effects.spawnEffect(x, y, type.color);
         this.active.push(monster);
@@ -120,8 +122,8 @@ const Monsters = {
                 const angle = Math.random() * Math.PI * 2;
                 const distance = 100 + Math.random() * 200;
                 pos = {
-                    x: CONFIG.CANVAS_WIDTH / 2 + Math.cos(angle) * distance,
-                    y: CONFIG.CANVAS_HEIGHT / 2 + Math.sin(angle) * distance
+                    x: CONFIG.CANVAS_WIDTH + Math.cos(angle) * distance,
+                    y: CONFIG.CANVAS_HEIGHT + Math.sin(angle) * distance
                 };
             } else {
                 // Edge spawn (on the arena boundary)
@@ -129,8 +131,8 @@ const Monsters = {
             }
             
             // Ensure position is within bounds
-            pos.x = Math.max(50, Math.min(CONFIG.CANVAS_WIDTH - 50, pos.x));
-            pos.y = Math.max(50, Math.min(CONFIG.CANVAS_HEIGHT - 50, pos.y));
+            pos.x = Math.max(50, Math.min(CONFIG.CANVAS_WIDTH * 2 - 50, pos.x));
+            pos.y = Math.max(50, Math.min(CONFIG.CANVAS_HEIGHT * 2 - 50, pos.y));
             clusterPositions.push(pos);
         }
         
@@ -235,7 +237,7 @@ const Monsters = {
     
     spawnBoss() {
         // Boss spawns separately at center
-        const bossX = CONFIG.CANVAS_WIDTH / 2, bossY = CONFIG.CANVAS_HEIGHT / 2;
+        const bossX = CONFIG.CANVAS_WIDTH, bossY = CONFIG.CANVAS_HEIGHT;
         Game.pendingSpawns++;
         const indicator = { x: bossX, y: bossY, timer: 2000, startTime: Date.now(), isBoss: true };
         this.spawnIndicators.push(indicator);
@@ -256,6 +258,10 @@ const Monsters = {
     },
     
     handleDeath(monster, index) {
+        // Prevent double death
+        if (monster._dead) return;
+        monster._dead = true;
+        
         let goldDrop = 0;
         if (monster.monsterType && monster.monsterType.goldDrop) {
             goldDrop = Math.floor((Math.random() * (monster.monsterType.goldDrop.max - monster.monsterType.goldDrop.min + 1) + monster.monsterType.goldDrop.min) * (1 + Player.goldMultiplier) * Game.difficultyMultipliers.goldGain);
@@ -266,15 +272,28 @@ const Monsters = {
         Game.addKill();
         Effects.deathEffect(monster.x, monster.y);
         Player.weapons.forEach(weapon => { if (weapon.isThrowable) { const returned = weapon.returnKnives?.(monster) || 0; if (returned > 0) Effects.healthPopup(monster.x, monster.y, returned); } });
-        if (monster.explosive) this.explode(monster);
+        
+        // Handle explosive death
+        if (monster.explosive && !monster.hasExploded) {
+            monster.hasExploded = true;
+            this.explode(monster);
+        }
+        
+        // Explosive kills perk
         if (Player.explosiveKills && !monster.isBoss) {
             Effects.explosion(monster.x, monster.y, 80, '#FF6600');
             for (let i = this.active.length - 1; i >= 0; i--) {
                 if (i === index) continue;
                 const other = this.active[i];
-                if (Physics.distance(monster, other) < 80 + other.radius) { other.health -= 50; Effects.damageIndicator(other.x, other.y, 50, false); if (other.health <= 0) this.handleDeath(other, i); }
+                if (other._dead) continue;
+                if (Physics.distance(monster, other) < 80 + other.radius) { 
+                    other.health -= 50; 
+                    Effects.damageIndicator(other.x, other.y, 50, false); 
+                    if (other.health <= 0) this.handleDeath(other, i); 
+                }
             }
         }
+        
         if (monster.isSplitter) this.split(monster);
         MonsterBrain.onMonsterDeath(monster);
         this.remove(monster, index);
@@ -282,15 +301,35 @@ const Monsters = {
     },
     
     explode(monster) {
+        // Prevent double explosion
+        if (monster.hasExploded) return;
+        monster.hasExploded = true;
+        
         const radius = monster.explosionRadius;
         const damage = monster.damage * (monster.explosionDamage || 2);
         Effects.explosion(monster.x, monster.y, radius, '#FF4500');
-        for (let i = this.active.length - 1; i >= 0; i--) {
-            const other = this.active[i];
+        
+        // Use a copy of the array to avoid modification during iteration
+        const targets = [...this.active];
+        for (let i = targets.length - 1; i >= 0; i--) {
+            const other = targets[i];
             if (other === monster) continue;
-            if (Physics.distance(monster, other) < radius + other.radius) { other.health -= damage; Effects.damageIndicator(other.x, other.y, damage, false); if (other.health <= 0) this.handleDeath(other, i); }
+            if (other._dead) continue;
+            if (Physics.distance(monster, other) < radius + other.radius) { 
+                other.health -= damage; 
+                Effects.damageIndicator(other.x, other.y, damage, false); 
+                if (other.health <= 0) {
+                    // Remove from active first to prevent re-triggering
+                    const idx = this.active.indexOf(other);
+                    if (idx > -1) this.active.splice(idx, 1);
+                    this.handleDeath(other, -1);
+                }
+            }
         }
-        if (Player.entity && Physics.distance(monster, Player.entity) < radius + Player.entity.radius) Player.takeDamage(damage, monster);
+        
+        if (Player.entity && Physics.distance(monster, Player.entity) < radius + Player.entity.radius) {
+            Player.takeDamage(damage, monster);
+        }
     },
     
     split(monster) {
@@ -299,12 +338,23 @@ const Monsters = {
         for (let i = 0; i < count; i++) {
             const angle = (i / count) * Math.PI * 2, dist = 30;
             const child = this.create(monster.type, false, monster.x + Math.cos(angle) * dist, monster.y + Math.sin(angle) * dist);
-            if (child) { child.health = health; child.maxHealth = health; child.radius = monster.radius * 0.7; child.hitboxRadius = child.radius * CONFIG.HITBOX.MONSTER; child.isSplitter = false; child.color = '#aaffaa'; child.originalSpeed = monster.originalSpeed * 1.2; child.speed = child.originalSpeed; }
+            if (child) { 
+                child.health = health; 
+                child.maxHealth = health; 
+                child.radius = monster.radius * 0.7; 
+                child.hitboxRadius = child.radius * CONFIG.HITBOX.MONSTER; 
+                child.isSplitter = false; 
+                child.color = '#aaffaa'; 
+                child.originalSpeed = monster.originalSpeed * 1.2; 
+                child.speed = child.originalSpeed; 
+                // Don't explode children
+                child.explosive = false;
+            }
         }
         Effects.explosion(monster.x, monster.y, 50, '#0F0');
     },
     
-    // NEW: Allow monsters to attack walls
+    // Allow monsters to attack walls
     checkWallAttack(monster, currentTime) {
         if (currentTime - monster.lastAttack < monster.attackCooldown) return false;
         
@@ -427,7 +477,6 @@ const Monsters = {
         }
     },
     
-    // The following draw methods are unchanged from original
     drawNormalAttack(ctx, monster, progress, alpha) {
         const biteProgress = Math.sin(progress * Math.PI), jawOpen = biteProgress * 12, dist = monster.attackRange * progress;
         ctx.fillStyle = `rgba(255,107,107,${alpha})`;
