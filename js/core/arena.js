@@ -3,45 +3,35 @@
 // ============================================
 
 const Arena = {
-    // Shift values (set both to 0 to align with the CSS container border)
     shiftX: 0,
     shiftY: 0,
-
-    // Arena boundaries (calculated in init)
     bounds: {
         minX: 0,
         minY: 0,
         maxX: 0,
         maxY: 0
     },
-
-    // Wall entities
     walls: [],
-
-    // Decorative elements
     decorations: [],
 
     init() {
         this.walls = [];
         this.decorations = [];
-
-        // Use the entire canvas area – no padding, no shift
         this.bounds = {
             minX: 0,
             minY: 0,
-            maxX: CONFIG.CANVAS_WIDTH,
-            maxY: CONFIG.CANVAS_HEIGHT
+            maxX: CONFIG.CANVAS_WIDTH * 2,
+            maxY: CONFIG.CANVAS_HEIGHT * 2
         };
-
         this.generateDecorations();
     },
 
     generateDecorations() {
-        for (let i = 0; i < 8; i++) {
+        for (let i = 0; i < 12; i++) {
             this.decorations.push({
                 x: Math.random() * (this.bounds.maxX - this.bounds.minX) + this.bounds.minX,
                 y: Math.random() * (this.bounds.maxY - this.bounds.minY) + this.bounds.minY,
-                radius: 5 + Math.random() * 15,
+                radius: 5 + Math.random() * 25,
                 alpha: 0.05 + Math.random() * 0.1
             });
         }
@@ -83,8 +73,8 @@ const Arena = {
 
     getRandomSpawnPosition(minDistFromCenter = 100, minDistFromPlayer = 150) {
         let x, y, valid = false;
-        const centerX = CONFIG.CANVAS_WIDTH / 2;
-        const centerY = CONFIG.CANVAS_HEIGHT / 2;
+        const centerX = this.bounds.maxX / 2;
+        const centerY = this.bounds.maxY / 2;
         const player = Player.entity;
 
         for (let attempts = 0; attempts < 50; attempts++) {
@@ -107,7 +97,6 @@ const Arena = {
                     y = this.bounds.minY + Math.random() * (this.bounds.maxY - this.bounds.minY);
             }
 
-            // Check if position is inside any wall
             let insideWall = false;
             for (let wall of this.walls) {
                 if (wall.destroyed) continue;
@@ -143,7 +132,6 @@ const Arena = {
             x = this.bounds.minX + margin + Math.random() * (this.bounds.maxX - this.bounds.minX - margin * 2);
             y = this.bounds.minY + margin + Math.random() * (this.bounds.maxY - this.bounds.minY - margin * 2);
 
-            // Check if position is inside any wall
             let insideWall = false;
             for (let wall of this.walls) {
                 if (wall.destroyed) continue;
@@ -180,50 +168,38 @@ const Arena = {
         const ctx = Game.ctx;
         const b = this.bounds;
 
-        // Draw arena boundary exactly at canvas edges
         ctx.strokeStyle = 'rgba(100, 100, 150, 0.5)';
         ctx.lineWidth = CONFIG.ARENA.WALL_THICKNESS;
-        ctx.strokeRect(
-            b.minX - 1,   // tiny offset to align perfectly with the container's 3px border
-            b.minY - 1,
-            b.maxX - b.minX + 2,
-            b.maxY - b.minY + 2
-        );
+        ctx.strokeRect(b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY);
 
-        // Corner markers
         const cornerSize = 15;
         ctx.strokeStyle = 'rgba(255, 200, 0, 0.3)';
         ctx.lineWidth = 2;
 
-        // Top-left
         ctx.beginPath();
         ctx.moveTo(b.minX, b.minY + cornerSize);
         ctx.lineTo(b.minX, b.minY);
         ctx.lineTo(b.minX + cornerSize, b.minY);
         ctx.stroke();
 
-        // Top-right
         ctx.beginPath();
         ctx.moveTo(b.maxX - cornerSize, b.minY);
         ctx.lineTo(b.maxX, b.minY);
         ctx.lineTo(b.maxX, b.minY + cornerSize);
         ctx.stroke();
 
-        // Bottom-left
         ctx.beginPath();
         ctx.moveTo(b.minX, b.maxY - cornerSize);
         ctx.lineTo(b.minX, b.maxY);
         ctx.lineTo(b.minX + cornerSize, b.maxY);
         ctx.stroke();
 
-        // Bottom-right
         ctx.beginPath();
         ctx.moveTo(b.maxX, b.maxY - cornerSize);
         ctx.lineTo(b.maxX, b.maxY);
         ctx.lineTo(b.maxX - cornerSize, b.maxY);
         ctx.stroke();
 
-        // Decorations
         for (let deco of this.decorations) {
             ctx.fillStyle = `rgba(100, 100, 150, ${deco.alpha})`;
             ctx.beginPath();
@@ -231,25 +207,17 @@ const Arena = {
             ctx.fill();
         }
 
-        // Walls
         for (let wall of this.walls) {
             if (wall.destroyed) continue;
-            
-            // Wall shadow
             ctx.shadowColor = 'rgba(0,0,0,0.5)';
             ctx.shadowBlur = 10;
-            
-            // Wall body
             ctx.fillStyle = wall.color || 'rgba(60, 60, 120, 0.7)';
             ctx.fillRect(wall.x - wall.width/2, wall.y - wall.height/2, wall.width, wall.height);
-            
-            // Wall border
             ctx.shadowBlur = 0;
             ctx.strokeStyle = 'rgba(150, 150, 200, 0.5)';
             ctx.lineWidth = 2;
             ctx.strokeRect(wall.x - wall.width/2, wall.y - wall.height/2, wall.width, wall.height);
             
-            // Health bar for walls
             if (wall.health !== undefined && wall.health < wall.maxHealth) {
                 const hpPercent = wall.health / wall.maxHealth;
                 ctx.fillStyle = 'rgba(0,0,0,0.7)';
@@ -259,19 +227,18 @@ const Arena = {
             }
         }
 
-        // Grid
         ctx.strokeStyle = 'rgba(100, 100, 150, 0.05)';
         ctx.lineWidth = 1;
-        for (let x = 0; x < CONFIG.CANVAS_WIDTH; x += 50) {
+        for (let x = 0; x < this.bounds.maxX; x += 50) {
             ctx.beginPath();
             ctx.moveTo(x, 0);
-            ctx.lineTo(x, CONFIG.CANVAS_HEIGHT);
+            ctx.lineTo(x, this.bounds.maxY);
             ctx.stroke();
         }
-        for (let y = 0; y < CONFIG.CANVAS_HEIGHT; y += 50) {
+        for (let y = 0; y < this.bounds.maxY; y += 50) {
             ctx.beginPath();
             ctx.moveTo(0, y);
-            ctx.lineTo(CONFIG.CANVAS_WIDTH, y);
+            ctx.lineTo(this.bounds.maxX, y);
             ctx.stroke();
         }
     }
