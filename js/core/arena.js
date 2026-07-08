@@ -44,11 +44,11 @@ const Arena = {
     setWalls(wallData) {
         this.clearWalls();
         for (let wall of wallData) {
-            this.addWall(wall.x, wall.y, wall.width, wall.height, wall.color, wall.health);
+            this.addWall(wall.x, wall.y, wall.width, wall.height, wall.color, wall.health, wall.indestructible || false);
         }
     },
 
-    addWall(x, y, width, height, color = '#2a2a4a', health = 100) {
+    addWall(x, y, width, height, color = '#2a2a4a', health = 100, indestructible = false) {
         const wall = {
             x, y, width, height,
             hitboxRadius: Math.max(width, height) / 2,
@@ -57,7 +57,8 @@ const Arena = {
             color: color,
             health: health,
             maxHealth: health,
-            destroyed: false
+            destroyed: false,
+            indestructible: indestructible
         };
         this.walls.push(wall);
         Physics.register(wall);
@@ -218,7 +219,8 @@ const Arena = {
             ctx.lineWidth = 2;
             ctx.strokeRect(wall.x - wall.width/2, wall.y - wall.height/2, wall.width, wall.height);
             
-            if (wall.health !== undefined && wall.health < wall.maxHealth) {
+            // Health bar for walls (only if not indestructible)
+            if (wall.health !== Infinity && wall.health !== undefined && wall.health < wall.maxHealth) {
                 const hpPercent = wall.health / wall.maxHealth;
                 ctx.fillStyle = 'rgba(0,0,0,0.7)';
                 ctx.fillRect(wall.x - wall.width/2, wall.y - wall.height/2 - 8, wall.width, 4);
