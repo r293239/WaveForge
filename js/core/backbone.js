@@ -22,7 +22,7 @@ const Game = {
     autoSaveInterval: null,
     purchasedItems: {},
     weaponUpgrades: {},
-    currentMap: 'open_arena',
+    currentMap: 'empty_arena',
     camera: Camera,
 
     init() {
@@ -102,23 +102,13 @@ const Game = {
             console.log('Initializing Save...');
             Save.init();
 
-            console.log('Initializing MapSelection...');
-            MapSelection.init();
-
             console.log('All systems initialized successfully');
 
             this.setupKeyboard();
             Overlays.showStart();
             this.gameLoop();
         } catch (e) {
-            console.error('Game initialization error details:');
-            console.error('Error name:', e.name);
-            console.error('Error message:', e.message);
-            console.error('Error stack:', e.stack);
-            const errorMsg = document.createElement('div');
-            errorMsg.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#ff0000;color:#fff;padding:20px;border-radius:10px;z-index:9999;max-width:500px;text-align:center;font-size:16px;';
-            errorMsg.innerHTML = `<h2>Error Starting Game</h2><p>${e.message || 'Unknown error'}</p><p style="font-size:12px;color:#ffcccc;">Check console for details</p>`;
-            document.body.appendChild(errorMsg);
+            console.error('Game initialization error:', e);
         }
     },
 
@@ -142,10 +132,11 @@ const Game = {
 
     gameLoop() {
         try {
-            const currentTime = Date.now(),
-                deltaTime = currentTime - this.lastFrameTime;
+            const currentTime = Date.now();
+            const deltaTime = currentTime - this.lastFrameTime;
             this.lastFrameTime = currentTime;
 
+            // === CRITICAL: Only update game logic when in WAVE state ===
             if (this.state === GAME_STATE.WAVE) {
                 Player.update(deltaTime);
                 Monsters.update(currentTime);
@@ -162,8 +153,10 @@ const Game = {
                 Physics.resolvePlayerMonsterCollisions();
             }
 
+            // === Always render ===
             this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
+            // Camera follows player if exists
             if (Player.entity) {
                 this.camera.follow(Player.entity);
             }
@@ -205,19 +198,20 @@ const Game = {
         console.log('🟢 startGameWithMap() called – starting game!');
         
         // Reset everything
-        this.state = GAME_STATE.WAVE;
+        this.state = GAME_STATE.WAVE;  // <-- CRITICAL: Set state to WAVE
         this.wave = 1;
         this.gold = CONFIG.PLAYER_START.gold;
         this.kills = 0;
         this.refreshCount = 0;
         this.refreshCost = CONFIG.SHOP_REFRESH_BASE_COST;
-        this.waveActive = true;
+        this.waveActive = true;       // <-- CRITICAL: Set waveActive to true
         this.pendingSpawns = 0;
         this.sandboxMode = false;
         this.gameWon = false;
         this.purchasedItems = {};
         this.weaponUpgrades = {};
 
+        // Reset all systems
         Player.reset();
         Monsters.reset();
         Boss.reset();
@@ -235,17 +229,24 @@ const Game = {
             console.error('❌ Handgun data not found!');
         }
 
+        // Generate shop items
         Shop.generateItems();
+
+        // === CRITICAL: Start the first wave ===
         Waves.startWave();
+
+        // Reset ability cooldowns
         Abilities.resetCooldowns();
 
+        // Auto-save
         if (this.autoSaveInterval) clearInterval(this.autoSaveInterval);
         this.autoSaveInterval = setInterval(() => Save.saveGame(), CONFIG.AUTO_SAVE_INTERVAL);
 
+        // Update HUD and hide overlays
         HUD.updateAll();
         Overlays.hideAll();
 
-        console.log('✅ Game started successfully!');
+        console.log('✅ Game started successfully! Wave 1 should now spawn monsters.');
     },
 
     startNextWave() {
@@ -305,8 +306,10 @@ const Game = {
         Overlays.showGameOver();
     },
 
-    addKill() { this.kills++;
-        HUD.updateStats(); }
+    addKill() {
+        this.kills++;
+        HUD.updateStats();
+    }
 };
 
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
