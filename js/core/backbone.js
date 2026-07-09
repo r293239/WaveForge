@@ -136,7 +136,7 @@ const Game = {
             const deltaTime = currentTime - this.lastFrameTime;
             this.lastFrameTime = currentTime;
 
-            // === CRITICAL: Only update game logic when in WAVE state ===
+            // === Only update game logic if in WAVE state ===
             if (this.state === GAME_STATE.WAVE) {
                 Player.update(deltaTime);
                 Monsters.update(currentTime);
@@ -156,7 +156,6 @@ const Game = {
             // === Always render ===
             this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-            // Camera follows player if exists
             if (Player.entity) {
                 this.camera.follow(Player.entity);
             }
@@ -196,15 +195,15 @@ const Game = {
 
     startGameWithMap() {
         console.log('🟢 startGameWithMap() called – starting game!');
-        
-        // Reset everything
-        this.state = GAME_STATE.WAVE;  // <-- CRITICAL: Set state to WAVE
+
+        // === CRITICAL: Set state and wave active ===
+        this.state = GAME_STATE.WAVE;
         this.wave = 1;
         this.gold = CONFIG.PLAYER_START.gold;
         this.kills = 0;
         this.refreshCount = 0;
         this.refreshCost = CONFIG.SHOP_REFRESH_BASE_COST;
-        this.waveActive = true;       // <-- CRITICAL: Set waveActive to true
+        this.waveActive = true;
         this.pendingSpawns = 0;
         this.sandboxMode = false;
         this.gameWon = false;
@@ -246,7 +245,7 @@ const Game = {
         HUD.updateAll();
         Overlays.hideAll();
 
-        console.log('✅ Game started successfully! Wave 1 should now spawn monsters.');
+        console.log('✅ Game started! Wave 1 should now spawn monsters.');
     },
 
     startNextWave() {
