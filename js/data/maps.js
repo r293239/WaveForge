@@ -152,15 +152,12 @@ const MapGenerators = {
         const cols = Math.floor((CONFIG.CANVAS_WIDTH * 2) / roomSize);
         const rows = Math.floor((CONFIG.CANVAS_HEIGHT * 2) / roomSize);
         
-        // Generate a maze-like grid of rooms with gaps
         for (let y = 0; y < rows; y++) {
             for (let x = 0; x < cols; x++) {
                 const cx = x * roomSize + roomSize / 2;
                 const cy = y * roomSize + roomSize / 2;
                 
-                // Randomly add walls to create a maze
                 if (Math.random() < 0.3) {
-                    // Horizontal wall (with gap)
                     const hasGap = Math.random() < 0.3;
                     if (hasGap) {
                         const gapSize = 30;
@@ -197,7 +194,6 @@ const MapGenerators = {
                 }
                 
                 if (Math.random() < 0.3) {
-                    // Vertical wall (with gap)
                     const hasGap = Math.random() < 0.3;
                     if (hasGap) {
                         const gapSize = 30;
@@ -235,7 +231,6 @@ const MapGenerators = {
             }
         }
         
-        // Add some random pillar-like obstacles
         for (let i = 0; i < 10; i++) {
             const x = 50 + Math.random() * (CONFIG.CANVAS_WIDTH * 2 - 100);
             const y = 50 + Math.random() * (CONFIG.CANVAS_HEIGHT * 2 - 100);
@@ -250,5 +245,116 @@ const MapGenerators = {
         }
         
         return walls;
+    }
+};
+
+const MapSelection = {
+    selectedMap: 'empty_arena',
+
+    init() {
+        if (!document.getElementById('mapSelectionOverlay')) {
+            const overlay = document.createElement('div');
+            overlay.id = 'mapSelectionOverlay';
+            overlay.className = 'overlay';
+            overlay.style.display = 'none';
+            document.body.appendChild(overlay);
+        }
+        console.log('✅ MapSelection initialized');
+    },
+
+    show() {
+        console.log('🟢 MapSelection.show() called');
+        const overlay = document.getElementById('mapSelectionOverlay');
+        if (!overlay) {
+            console.error('❌ MapSelection overlay not found!');
+            return;
+        }
+
+        overlay.innerHTML = `
+            <div class="overlay-content" style="max-width: 900px; background: rgba(30,30,60,0.95); padding: 40px; border-radius: 20px; border: 3px solid #ffd700;">
+                <h2 class="overlay-title" style="font-size: 3rem; color: #ffd700; margin-bottom: 20px;">🗺️ Select Your Arena</h2>
+                <p style="color: #aaa; font-size: 1.2rem; margin-bottom: 30px;">Choose a map for your run.</p>
+                <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:15px;margin:20px 0;">
+                    ${this.generateMapButtons()}
+                </div>
+                <div style="margin-top:20px;">
+                    <button class="btn btn-primary" id="confirmMapBtn" style="width:200px;margin:0 auto; padding: 15px 30px; background: linear-gradient(45deg, #ff6b6b, #ffa726); color: white; border: none; border-radius: 8px; font-size: 1.2rem; cursor: pointer;">
+                        <span>⚔️</span> Start Battle
+                    </button>
+                </div>
+            </div>
+        `;
+
+        overlay.querySelectorAll('.map-btn').forEach(btn => {
+            btn.addEventListener('click', () => this.selectMap(btn.dataset.mapId));
+            btn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                this.selectMap(btn.dataset.mapId);
+            });
+        });
+
+        const confirmBtn = document.getElementById('confirmMapBtn');
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', () => this.confirmMap());
+            confirmBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                this.confirmMap();
+            });
+        }
+
+        overlay.style.display = 'flex';
+        console.log('✅ Map selection displayed');
+    },
+
+    generateMapButtons() {
+        let html = '';
+        for (let [id, map] of Object.entries(MAP_DEFINITIONS)) {
+            const selected = id === this.selectedMap ? 'selected' : '';
+            html += `
+                <div class="map-btn ${selected}" data-map-id="${id}" style="
+                    background: ${id === this.selectedMap ? 'rgba(255,215,0,0.2)' : 'rgba(50,50,100,0.3)'};
+                    border: ${id === this.selectedMap ? '3px solid #ffd700' : '2px solid #5555aa'};
+                    border-radius: 10px;
+                    padding: 15px;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    text-align: left;
+                ">
+                    <div style="font-size:2rem;margin-bottom:5px;">${map.icon}</div>
+                    <div style="font-weight:bold;color:#fff;font-size:1.1rem;">${map.name}</div>
+                    <div style="font-size:0.8rem;color:#aaa;">${map.description}</div>
+                    <div style="font-size:0.7rem;color:#666;margin-top:5px;">
+                        Difficulty: ${map.difficulty.toUpperCase()}
+                    </div>
+                </div>
+            `;
+        }
+        return html;
+    },
+
+    selectMap(mapId) {
+        console.log(`🟢 Selected map: ${mapId}`);
+        this.selectedMap = mapId;
+        const overlay = document.getElementById('mapSelectionOverlay');
+        overlay.querySelectorAll('.map-btn').forEach(btn => {
+            btn.style.background = 'rgba(50,50,100,0.3)';
+            btn.style.border = '2px solid #5555aa';
+            if (btn.dataset.mapId === mapId) {
+                btn.style.background = 'rgba(255,215,0,0.2)';
+                btn.style.border = '3px solid #ffd700';
+            }
+        });
+    },
+
+    confirmMap() {
+        console.log('🟢 confirmMap() called');
+        Game.currentMap = this.selectedMap;
+        document.getElementById('mapSelectionOverlay').style.display = 'none';
+        
+        const walls = MapGenerators.generateMap(this.selectedMap);
+        Arena.setWalls(walls);
+        
+        console.log(`✅ Map confirmed: ${this.selectedMap}, calling startGameWithMap()`);
+        Game.startGameWithMap();
     }
 };
