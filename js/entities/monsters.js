@@ -2,6 +2,9 @@
 // WAVEFORGE - Monster System (LOGIC)
 // ============================================
 
+// Ensure MONSTER_TYPES is available - use window reference
+const MONSTER_TYPES = window.MONSTER_TYPES || {};
+
 const Monsters = {
     active: [],
     spawnIndicators: [],
@@ -50,7 +53,10 @@ const Monsters = {
     
     create(typeKey, isBoss = false, spawnX = null, spawnY = null) {
         const type = MONSTER_TYPES[typeKey];
-        if (!type) return null;
+        if (!type) {
+            console.warn('Unknown monster type:', typeKey);
+            return null;
+        }
         const waveConfig = Waves.getWaveConfig(Game.wave);
         let health, damage;
         if (isBoss) {
@@ -62,7 +68,11 @@ const Monsters = {
         }
         let x, y;
         if (spawnX !== null && spawnY !== null) { x = spawnX; y = spawnY; }
-        else { const pos = Arena.getRandomSpawnPosition(); x = pos.x; y = pos.y; }
+        else { 
+            const pos = Arena.getRandomSpawnPosition(); 
+            x = pos.x; 
+            y = pos.y; 
+        }
         const radius = (isBoss ? 45 : (15 + Math.random() * 10)) * type.sizeMultiplier;
         const monster = {
             x, y, radius, hitboxRadius: radius * CONFIG.HITBOX.MONSTER,
@@ -90,7 +100,6 @@ const Monsters = {
             spawnClusterId: null,
             hasExploded: false,
             _dead: false,
-            // === NEW: Spawn invulnerability ===
             spawnTime: Date.now(),
             invulnerableUntil: Date.now() + 300
         };
@@ -260,7 +269,6 @@ const Monsters = {
         Effects.deathEffect(monster.x, monster.y);
         Player.weapons.forEach(weapon => { if (weapon.isThrowable) { const returned = weapon.returnKnives?.(monster) || 0; if (returned > 0) Effects.healthPopup(monster.x, monster.y, returned); } });
         
-        // === FIX: Explosive monsters explode on death ===
         if (monster.explosive && !monster.hasExploded) {
             monster.hasExploded = true;
             this.explode(monster);
@@ -287,14 +295,12 @@ const Monsters = {
     },
     
     explode(monster) {
-        // Prevent double explosion
         if (monster.hasExploded) return;
         monster.hasExploded = true;
         
         const radius = monster.explosionRadius;
         const damage = monster.damage * (monster.explosionDamage || 2);
         
-        // === FIX: Show explosion effect ===
         Effects.explosion(monster.x, monster.y, radius, '#FF4500');
         
         const targets = [...this.active];
@@ -579,3 +585,5 @@ const Monsters = {
         }
     }
 };
+
+console.log('✅ Monsters system loaded');
