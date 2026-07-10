@@ -203,7 +203,7 @@ const Game = {
         this.kills = 0;
         this.refreshCount = 0;
         this.refreshCost = CONFIG.SHOP_REFRESH_BASE_COST;
-        this.waveActive = true;
+        this.waveActive = false;  // Changed: start as false, Waves.startWave() will set to true
         this.pendingSpawns = 0;
         this.sandboxMode = false;
         this.gameWon = false;
@@ -232,6 +232,7 @@ const Game = {
         Shop.generateItems();
 
         // === CRITICAL: Start the first wave ===
+        // This will set waveActive = true and spawn monsters
         Waves.startWave();
 
         // Reset ability cooldowns
