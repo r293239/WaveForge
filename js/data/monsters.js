@@ -2,7 +2,8 @@
 // WAVEFORGE - Monster Type Definitions (DATA)
 // ============================================
 
-const MONSTER_TYPES = {
+// Use var instead of const to ensure global scope
+var MONSTER_TYPES = {
     NORMAL: {
         name: 'Normal', color: '#ff6b6b', speed: 1,
         healthMultiplier: 1, damageMultiplier: 1, sizeMultiplier: 1,
@@ -74,3 +75,6 @@ const MONSTER_TYPES = {
         attackRange: 40, attackDamage: 2.5, attackSpeed: 1500
     }
 };
+
+// Make it available globally (redundant with var, but just in case)
+window.MONSTER_TYPES = MONSTER_TYPES;
