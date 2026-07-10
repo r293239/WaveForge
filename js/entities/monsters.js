@@ -166,7 +166,10 @@ const Monsters = {
             targetX: x, targetY: y, flockId: null, role: null,
             spawnClusterId: null,
             hasExploded: false,
-            _dead: false
+            _dead: false,
+            // === NEW: Spawn invulnerability ===
+            spawnTime: Date.now(),
+            invulnerableUntil: Date.now() + 300
         };
         Effects.spawnEffect(x, y, type.color);
         this.active.push(monster);
