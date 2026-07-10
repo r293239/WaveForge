@@ -1,319 +1,193 @@
 // ============================================
-// WAVEFORGE - Backbone (Game Core)
+// WAVEFORGE - Wave Management
 // ============================================
 
-const Game = {
-    state: GAME_STATE.START,
-    wave: 1,
-    gold: 50,
-    kills: 0,
-    refreshCount: 0,
-    refreshCost: 5,
-    waveActive: false,
-    waveStartTime: 0,
-    pendingSpawns: 0,
-    sandboxMode: false,
-    gameWon: false,
-    difficulty: DIFFICULTY.NORMAL,
-    difficultyMultipliers: { ...CONFIG.DIFFICULTY.normal },
-    lastFrameTime: Date.now(),
-    canvas: null,
-    ctx: null,
-    autoSaveInterval: null,
-    purchasedItems: {},
-    weaponUpgrades: {},
-    currentMap: 'empty_arena',
-    camera: Camera,
-
-    init() {
-        this.canvas = document.getElementById('gameCanvas');
-        if (!this.canvas) {
-            console.error('Canvas not found!');
-            return;
+const Waves = {
+    init() {},
+    
+    // Get wave configuration
+    getWaveConfig(waveNum) {
+        if (Game.sandboxMode && waveNum > 40) {
+            return this.getSandboxWaveConfig(waveNum);
         }
-        this.ctx = this.canvas.getContext('2d');
-        this.lastFrameTime = Date.now();
-        this.purchasedItems = {};
-        this.weaponUpgrades = {};
-
-        try {
-            console.log('Initializing Physics...');
-            Physics.init();
-
-            console.log('Initializing Arena...');
-            Arena.init();
-
-            console.log('Initializing Camera...');
-            this.camera.init();
-            this.camera.worldWidth = CONFIG.CANVAS_WIDTH * 2;
-            this.camera.worldHeight = CONFIG.CANVAS_HEIGHT * 2;
-
-            console.log('Initializing Player...');
-            Player.init();
-
-            console.log('Initializing Monsters...');
-            Monsters.init();
-
-            console.log('Initializing MonsterBrain...');
-            MonsterBrain.init();
-
-            console.log('Initializing Boss...');
-            Boss.init();
-
-            console.log('Initializing Combat...');
-            Combat.init();
-
-            console.log('Initializing Projectiles...');
-            Projectiles.init();
-
-            console.log('Initializing Effects...');
-            Effects.init();
-
-            console.log('Initializing Towers...');
-            Towers.init();
-
-            console.log('Initializing Shop...');
-            Shop.init();
-
-            console.log('Initializing Waves...');
-            Waves.init();
-
-            console.log('Initializing Upgrades...');
-            Upgrades.init();
-
-            console.log('Initializing Abilities...');
-            Abilities.init();
-
-            console.log('Initializing Messages...');
-            Messages.init();
-
-            console.log('Initializing HUD...');
-            HUD.init();
-
-            console.log('Initializing StatsPanel...');
-            StatsPanel.init();
-
-            console.log('Initializing Overlays...');
-            Overlays.init();
-
-            console.log('Initializing Joystick...');
-            Joystick.init();
-
-            console.log('Initializing Save...');
-            Save.init();
-
-            console.log('All systems initialized successfully');
-
-            this.setupKeyboard();
-            Overlays.showStart();
-            this.gameLoop();
-        } catch (e) {
-            console.error('Game initialization error:', e);
+        return WAVE_CONFIGS[waveNum - 1] || WAVE_CONFIGS[WAVE_CONFIGS.length - 1];
+    },
+    
+    // Get monster types for a wave
+    getMonsterTypesForWave(waveNum) {
+        if (waveNum % 10 === 0) return ['BOSS'];
+        
+        const comp = this.getDifficultyComposition(waveNum);
+        const types = [];
+        for (let i = 0; i < comp.normal; i++) types.push('NORMAL');
+        for (let i = 0; i < comp.fast; i++) types.push('FAST');
+        for (let i = 0; i < comp.tank; i++) types.push('TANK');
+        for (let i = 0; i < comp.explosive; i++) types.push('EXPLOSIVE');
+        for (let i = 0; i < comp.gunner; i++) types.push('GUNNER');
+        for (let i = 0; i < comp.splitter; i++) types.push('SPLITTER');
+        for (let i = 0; i < comp.dasher; i++) types.push('DASHER');
+        for (let i = 0; i < comp.vampire; i++) types.push('VAMPIRE');
+        return types;
+    },
+    
+    // Get non-boss types for boss waves
+    getNonBossTypesForWave(waveNum) {
+        const comp = this.getDifficultyComposition(waveNum);
+        const types = [];
+        for (let i = 0; i < comp.normal; i++) types.push('NORMAL');
+        for (let i = 0; i < comp.fast; i++) types.push('FAST');
+        for (let i = 0; i < comp.tank; i++) types.push('TANK');
+        for (let i = 0; i < comp.explosive; i++) types.push('EXPLOSIVE');
+        for (let i = 0; i < comp.gunner; i++) types.push('GUNNER');
+        for (let i = 0; i < comp.splitter; i++) types.push('SPLITTER');
+        for (let i = 0; i < comp.dasher; i++) types.push('DASHER');
+        for (let i = 0; i < comp.vampire; i++) types.push('VAMPIRE');
+        return types.sort(() => Math.random() - 0.5);
+    },
+    
+    // Get difficulty-scaled composition
+    getDifficultyComposition(waveNum) {
+        if (Game.sandboxMode && waveNum > 40) {
+            return this.getSandboxComposition(waveNum);
+        }
+        
+        switch (Game.difficulty) {
+            case 'easy': return WAVE_COMPOSITIONS_EASY[waveNum] || { normal: 3, fast: 0, tank: 0, explosive: 0, gunner: 0, splitter: 0, dasher: 0, vampire: 0 };
+            case 'impossible': return WAVE_COMPOSITIONS_IMPOSSIBLE[waveNum] || { normal: 4, fast: 1, tank: 1, explosive: 0, gunner: 1, splitter: 0, dasher: 1, vampire: 0 };
+            default: return WAVE_COMPOSITIONS[waveNum] || { normal: 3, fast: 0, tank: 0, explosive: 0, gunner: 0, splitter: 0, dasher: 0, vampire: 0 };
         }
     },
-
-    setupKeyboard() {
-        document.addEventListener('keydown', (e) => {
-            const key = e.key.toLowerCase();
-            if (key === ' ' && (this.state === GAME_STATE.SHOP || this.state === GAME_STATE.WIN)) {
-                e.preventDefault();
-                this.startNextWave();
-            }
-            if (key === 's' && e.ctrlKey) {
-                e.preventDefault();
-                Save.saveGame();
-            }
-            if (key === 'l' && e.ctrlKey) {
-                e.preventDefault();
-                Save.loadGame();
-            }
-        });
+    
+    // Sandbox wave composition (waves > 40)
+    getSandboxComposition(waveNum) {
+        const wavesPast = waveNum - 40;
+        const scaling = Math.floor(wavesPast / 5);
+        return {
+            normal: 15 + wavesPast * 2,
+            fast: 8 + scaling * 2,
+            tank: 6 + scaling * 2,
+            explosive: 5 + scaling,
+            gunner: 5 + scaling * 2,
+            splitter: 4 + scaling,
+            dasher: 4 + scaling,
+            vampire: 4 + scaling
+        };
     },
-
-    gameLoop() {
-        try {
-            const currentTime = Date.now();
-            const deltaTime = currentTime - this.lastFrameTime;
-            this.lastFrameTime = currentTime;
-
-            // === Only update game logic if in WAVE state ===
-            if (this.state === GAME_STATE.WAVE) {
-                Player.update(deltaTime);
-                Monsters.update(currentTime);
-                MonsterBrain.update(currentTime);
-                Boss.update(currentTime);
-                Combat.updateWeapons(currentTime);
-                Projectiles.update(currentTime);
-                Combat.updateMeleeAttacks(currentTime);
-                Effects.update(currentTime);
-                Towers.update(currentTime);
-                Monsters.updateStatusEffects(currentTime);
-                Waves.checkWaveEnd();
-                Physics.resolveMonsterCollisions();
-                Physics.resolvePlayerMonsterCollisions();
-            }
-
-            // === Always render ===
-            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-
-            if (Player.entity) {
-                this.camera.follow(Player.entity);
-            }
-
-            this.camera.apply(this.ctx);
-            Arena.draw();
-            Effects.drawGround();
-            Waves.drawIndicators();
-            Towers.draw();
-            Monsters.draw();
-            Projectiles.draw();
-            Combat.drawMeleeAttacks();
-            Boss.drawAttacks();
-            Effects.draw();
-            Player.draw();
-            this.camera.restore(this.ctx);
-
-            HUD.updateCooldowns();
-        } catch (e) {
-            console.error('Game loop error:', e);
-        }
-
-        requestAnimationFrame(() => this.gameLoop());
+    
+    // Sandbox wave config
+    getSandboxWaveConfig(waveNum) {
+        const comp = this.getSandboxComposition(waveNum);
+        const totalSpecial = comp.fast + comp.tank + comp.explosive + comp.gunner + comp.splitter + comp.dasher + comp.vampire;
+        const totalMonsters = comp.normal + totalSpecial;
+        const wavesPast = waveNum - 40;
+        
+        // Boss every 10 waves after 50
+        const isBoss = waveNum >= 50 && waveNum % 10 === 0;
+        const bossHealth = isBoss ? 30000 * Math.pow(1.3, Math.floor((waveNum - 50) / 10)) : 0;
+        
+        return {
+            number: waveNum,
+            monsters: isBoss ? (18 + Math.floor((waveNum - 50) / 10) * 5) : totalMonsters,
+            monsterHealth: 200 + wavesPast * 35,
+            monsterDamage: 40 + wavesPast * 2,
+            goldReward: 300 + wavesPast * 50,
+            isBoss: isBoss,
+            bossHealth: Math.floor(bossHealth)
+        };
     },
-
-    setDifficulty(mode) {
-        this.difficulty = mode;
-        this.sandboxMode = false;
-        this.gameWon = false;
-        this.difficultyMultipliers = { ...CONFIG.DIFFICULTY[mode] };
-    },
-
-    startGame() {
-        console.log('🟢 startGame() called – showing map selection');
-        MapSelection.show();
-    },
-
-    startGameWithMap() {
-        console.log('🟢 startGameWithMap() called – starting game!');
-
-        // === CRITICAL: Set state and wave active ===
-        this.state = GAME_STATE.WAVE;
-        this.wave = 1;
-        this.gold = CONFIG.PLAYER_START.gold;
-        this.kills = 0;
-        this.refreshCount = 0;
-        this.refreshCost = CONFIG.SHOP_REFRESH_BASE_COST;
-        this.waveActive = false;  // Changed: start as false, Waves.startWave() will set to true
-        this.pendingSpawns = 0;
-        this.sandboxMode = false;
-        this.gameWon = false;
-        this.purchasedItems = {};
-        this.weaponUpgrades = {};
-
-        // Reset all systems
-        Player.reset();
-        Monsters.reset();
-        Boss.reset();
-        Projectiles.reset();
-        Towers.reset();
-        Effects.reset();
-        Abilities.reset();
-
-        // Give player starting weapon
-        const handgunData = WEAPON_DATA.find(w => w.id === 'handgun');
-        if (handgunData) {
-            Player.addWeapon(handgunData);
-            console.log('✅ Handgun added');
-        } else {
-            console.error('❌ Handgun data not found!');
-        }
-
-        // Generate shop items
-        Shop.generateItems();
-
-        // === CRITICAL: Start the first wave ===
-        // This will set waveActive = true and spawn monsters
-        Waves.startWave();
-
-        // Reset ability cooldowns
-        Abilities.resetCooldowns();
-
-        // Auto-save
-        if (this.autoSaveInterval) clearInterval(this.autoSaveInterval);
-        this.autoSaveInterval = setInterval(() => Save.saveGame(), CONFIG.AUTO_SAVE_INTERVAL);
-
-        // Update HUD and hide overlays
-        HUD.updateAll();
-        Overlays.hideAll();
-
-        console.log('✅ Game started! Wave 1 should now spawn monsters.');
-    },
-
-    startNextWave() {
-        if (this.state !== GAME_STATE.SHOP && this.state !== GAME_STATE.WIN) return;
-        this.state = GAME_STATE.WAVE;
-        this.waveActive = true;
-        Waves.startWave();
-        Abilities.resetCooldowns();
-        HUD.hideWaveButton();
-    },
-
-    waveComplete() {
-        if (this.wave === 40 && !this.sandboxMode) {
-            this.gameWon = true;
-            this.state = GAME_STATE.WIN;
-            this.waveActive = false;
-            Save.clearSave();
-            Overlays.showWin();
-            return;
-        }
-        if (this.sandboxMode && this.wave === 40) Messages.show('Sandbox Mode Active!', 4000);
-        this.state = GAME_STATE.STAT_SELECT;
-        this.waveActive = false;
-        this.gold += Math.floor(Waves.getWaveConfig(this.wave).goldReward * (1 + Player.goldMultiplier));
-        Player.weapons.forEach(w => {
-            if (w.usesAmmo && !w.isThrowable) {
-                w.currentAmmo = w.magazineSize;
-                w.isReloading = false;
-            }
-        });
-        Save.saveGame();
-        Upgrades.showSelection();
-        HUD.updateAll();
-    },
-
-    gameOver() {
-        this.state = GAME_STATE.GAMEOVER;
-        this.waveActive = false;
-        if (this.autoSaveInterval) {
-            clearInterval(this.autoSaveInterval);
-            this.autoSaveInterval = null;
-        }
+    
+    // Start a new wave
+    startWave() {
+        console.log('🌊 Waves.startWave() called for wave', Game.wave);
+        
+        Game.waveActive = true;
+        Game.pendingSpawns = 0;
+        
+        // Reset per-wave states
+        if (Player.firstHitReduction) Player.firstHitActive = true;
         Player.inSlowField = false;
         Player.slowFieldTicks = 0;
         Player.speed = Player.baseSpeed * Player.speedMultiplier;
-        Save.clearSave();
-        if (Player.guardianAngel && !Player.guardianAngelUsed) {
-            Player.guardianAngelUsed = true;
-            Player.health = Math.max(1, Math.floor(Player.maxHealth * 0.5));
-            this.state = GAME_STATE.WAVE;
-            this.waveActive = true;
-            Messages.show('GUARDIAN ANGEL SAVED YOU!');
-            Effects.guardianAngel(Player.entity.x, Player.entity.y);
-            HUD.updateStats();
-            return;
+        
+        Player.weapons.forEach(w => {
+            if (w.resetEachRound) w.resetAmmo();
+            // Auto-retrieve thrown trident at wave start
+            if (w.id === 'spear' && w.isThrown) {
+                w.isThrown = false;
+                w.thrownX = 0;
+                w.thrownY = 0;
+                if (w.usesAmmo) w.currentAmmo = w.magazineSize;
+            }
+        });
+        
+        // Reset systems
+        Monsters.reset();
+        Boss.reset();
+        Projectiles.reset();
+        Physics.clear();
+        Towers.reset();          // <-- Clear old towers to prevent stacking
+        
+        const waveConfig = this.getWaveConfig(Game.wave);
+        console.log('📊 Wave config:', waveConfig);
+        
+        // Update wave display
+        const waveDisplay = document.getElementById('waveDisplay');
+        waveDisplay.classList.remove('boss-wave');
+        
+        if (Game.sandboxMode && Game.wave > 40) {
+            waveDisplay.textContent = `🏖️ Wave ${Game.wave} (Sandbox)`;
+        } else {
+            waveDisplay.textContent = `Wave ${Game.wave} (${Game.difficulty.toUpperCase()})`;
         }
-        Overlays.showGameOver();
-    },
+        
+        if (waveConfig.isBoss || (Game.sandboxMode && Game.wave > 40 && Game.wave % 10 === 0)) {
+            if (Game.wave === 10) waveDisplay.textContent = 'BOSS WAVE 10 - SHADOW DAGGER';
+            else if (Game.wave === 20) waveDisplay.textContent = 'BOSS WAVE 20 - WAR HAMMER';
+            else if (Game.wave === 30) waveDisplay.textContent = 'BOSS WAVE 30 - SOUL REAPER';
+            else if (Game.wave === 40) waveDisplay.textContent = 'FINAL BOSS - VOID BLADE';
+            else if (Game.sandboxMode && Game.wave > 40) waveDisplay.textContent = `🏖️ SANDSTORM BOSS ${Game.wave}`;
+            waveDisplay.classList.add('boss-wave');
+        }
+        
+        waveDisplay.style.opacity = 1;
+        setTimeout(() => { waveDisplay.style.opacity = 0.5; }, 2500);
+        
+        // Spawn monsters
+        if (waveConfig.isBoss || (Game.sandboxMode && Game.wave > 40 && Game.wave % 10 === 0)) {
+            // Boss waves: spawn boss first, then clusters of minions
+            console.log('👑 Spawning boss wave');
+            Monsters.spawnBoss();
+            Monsters.spawnWave(waveConfig, true);
+        } else {
+            // Regular waves: spawn in clusters
+            console.log('👾 Spawning regular wave with', waveConfig.monsters, 'monsters');
+            Monsters.spawnWave(waveConfig, false);
+        }
+        
+        // Deploy all towers (landmines, healing towers, turrets) – fresh start each wave
+        Towers.deployAll();
 
-    addKill() {
-        this.kills++;
+        Save.saveGame();  // Auto-save at the start of a wave
+        
         HUD.updateStats();
+        document.getElementById('monsterCount').textContent = `Monsters: ${Monsters.active.length + Game.pendingSpawns}`;
+        console.log('✅ Wave start complete. Active monsters:', Monsters.active.length, 'Pending:', Game.pendingSpawns);
+    },
+    
+    // Check if wave is complete
+    checkWaveEnd() {
+        if (!Game.waveActive) return;
+        
+        // Wave is complete when all monsters are dead AND no pending spawns
+        if (Monsters.active.length === 0 && Game.pendingSpawns === 0) {
+            console.log('🎉 Wave complete!');
+            Game.wave++;
+            Game.waveComplete();
+        }
+    },
+    
+    // Draw spawn indicators
+    drawIndicators() {
+        Monsters.drawIndicators();
     }
 };
-
-if (document.readyState === 'complete' || document.readyState === 'interactive') {
-    setTimeout(() => Game.init(), 100);
-} else {
-    document.addEventListener('DOMContentLoaded', () => Game.init());
-}
